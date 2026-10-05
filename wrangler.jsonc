@@ -1,0 +1,32 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "hr-erp",
+  "main": "src/api/index.ts",
+  "compatibility_date": "2024-09-23",
+  "compatibility_flags": [
+    "nodejs_compat"
+  ],
+  "assets": {
+    "directory": "./dist",
+    "binding": "ASSETS",
+    "not_found_handling": "single-page-application"
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "hr-erp-db",
+      "database_id": "hr-erp-db-local",
+      "migrations_dir": "drizzle/migrations"
+    }
+  ],
+  "r2_buckets": [
+    {
+      "binding": "BUCKET",
+      "bucket_name": "hr-erp-documents"
+    }
+  ],
+  "vars": {
+    "ENVIRONMENT": "development",
+    "JWT_SECRET": "hr-erp-default-jwt-secret-key-32-chars-minimum"
+  }
+}

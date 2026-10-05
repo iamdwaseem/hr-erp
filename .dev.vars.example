@@ -1,0 +1,4 @@
+# Cloudflare Worker Local Environment Variables (.dev.vars)
+# Copy this file to .dev.vars for local development overrides
+ENVIRONMENT=development
+JWT_SECRET=hr-erp-local-dev-secret-key-replace-in-production-min-32-chars
