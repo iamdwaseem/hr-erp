@@ -17,15 +17,25 @@ import {
   Loader2,
   AlertCircle,
   FileCheck2,
+  PlusCircle,
 } from "lucide-react";
 import { apiClient } from "../../lib/api-client";
 import { useAuth } from "../../hooks/use-auth";
 import { ROLES } from "../../../shared/constants/roles";
 import type { Employee } from "../../../shared/types/employee";
+import { DOCUMENT_STATUS_CONFIG } from "../../../shared/types/document";
+import {
+  usePassport,
+  useVisa,
+  useWorkPermit,
+} from "../../hooks/use-documents";
 import { Button } from "../../components/ui/button";
 import { Badge } from "../../components/ui/badge";
 import { Card, CardHeader, CardTitle, CardContent } from "../../components/ui/card";
 import { EmployeeFormDialog } from "./employee-form-dialog";
+import { PassportDialog } from "./passport-dialog";
+import { VisaDialog } from "./visa-dialog";
+import { WorkPermitDialog } from "./work-permit-dialog";
 
 interface EmployeeProfileProps {
   employeeId: string;
@@ -49,9 +59,15 @@ export const EmployeeProfile: React.FC<EmployeeProfileProps> = ({
   const [activeTab, setActiveTab] = useState<TabType>("overview");
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
 
+  // Document Dialog states
+  const [isPassportDialogOpen, setIsPassportDialogOpen] = useState(false);
+  const [isVisaDialogOpen, setIsVisaDialogOpen] = useState(false);
+  const [isWorkPermitDialogOpen, setIsWorkPermitDialogOpen] = useState(false);
+
   const canEdit = hasRole([ROLES.ADMIN, ROLES.HR]);
   const isEmployeeRole = user?.role === ROLES.EMPLOYEE;
 
+  // 1. Fetch Employee Record
   const {
     data: employee,
     isLoading,
@@ -62,6 +78,14 @@ export const EmployeeProfile: React.FC<EmployeeProfileProps> = ({
     queryKey: ["employee", employeeId],
     queryFn: () => apiClient.get<Employee>(`/employees/${employeeId}`),
   });
+
+  // Effective employee ID (if 'me', resolved ID after load)
+  const effectiveId = employee?.id || employeeId;
+
+  // 2. Document Queries
+  const { data: passport, isLoading: isPassportLoading } = usePassport(effectiveId);
+  const { data: visa, isLoading: isVisaLoading } = useVisa(effectiveId);
+  const { data: workPermit, isLoading: isWorkPermitLoading } = useWorkPermit(effectiveId);
 
   if (isLoading) {
     return (
@@ -219,10 +243,10 @@ export const EmployeeProfile: React.FC<EmployeeProfileProps> = ({
             { id: "overview", label: "Overview", icon: ShieldCheck },
             { id: "personal", label: "Personal", icon: Briefcase },
             { id: "employment", label: "Employment", icon: Building },
-            { id: "passport", label: "Passport", icon: Plane, phase2: true },
-            { id: "visa", label: "Visa", icon: FileText, phase2: true },
-            { id: "work_permit", label: "Work Permit", icon: CreditCard, phase2: true },
-            { id: "documents", label: "Documents", icon: FileCheck2, phase2: true },
+            { id: "passport", label: "Passport", icon: Plane },
+            { id: "visa", label: "Visa", icon: FileText },
+            { id: "work_permit", label: "Work Permit", icon: CreditCard },
+            { id: "documents", label: "Documents", icon: FileCheck2, comingSoon: true },
           ].map((tab) => {
             const Icon = tab.icon;
             const isActive = activeTab === tab.id;
@@ -238,9 +262,9 @@ export const EmployeeProfile: React.FC<EmployeeProfileProps> = ({
               >
                 <Icon className="h-4 w-4" />
                 <span>{tab.label}</span>
-                {tab.phase2 && (
+                {tab.comingSoon && (
                   <span className="rounded bg-muted px-1.5 py-0.2 text-[10px] text-muted-foreground font-normal">
-                    Phase 2
+                    Next Phase
                   </span>
                 )}
               </button>
@@ -249,7 +273,7 @@ export const EmployeeProfile: React.FC<EmployeeProfileProps> = ({
         </div>
       </div>
 
-      {/* Tab Contents */}
+      {/* Tab Contents: Overview */}
       {activeTab === "overview" && (
         <div className="grid gap-6 md:grid-cols-2">
           {/* Contact summary */}
@@ -307,6 +331,7 @@ export const EmployeeProfile: React.FC<EmployeeProfileProps> = ({
         </div>
       )}
 
+      {/* Tab Contents: Personal */}
       {activeTab === "personal" && (
         <Card>
           <CardHeader>
@@ -351,6 +376,7 @@ export const EmployeeProfile: React.FC<EmployeeProfileProps> = ({
         </Card>
       )}
 
+      {/* Tab Contents: Employment */}
       {activeTab === "employment" && (
         <Card>
           <CardHeader>
@@ -415,43 +441,281 @@ export const EmployeeProfile: React.FC<EmployeeProfileProps> = ({
         </Card>
       )}
 
-      {/* Placeholders for subsequent phases (Passport, Visa, Work Permit, Documents) */}
+      {/* Tab Contents: Passport (Functional) */}
       {activeTab === "passport" && (
-        <Card className="border-dashed text-center py-12">
-          <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-primary/10 text-primary">
-            <Plane className="h-6 w-6" />
-          </div>
-          <CardTitle className="mt-4 text-lg">Passport Details</CardTitle>
-          <p className="mt-2 text-sm text-muted-foreground max-w-sm mx-auto">
-            Passport number, issue country, issue date, and expiry tracking will be available in the upcoming phase.
-          </p>
-        </Card>
+        <div>
+          {isPassportLoading ? (
+            <div className="flex min-h-[200px] items-center justify-center p-8">
+              <Loader2 className="h-6 w-6 animate-spin text-primary" />
+            </div>
+          ) : !passport ? (
+            <Card className="border-dashed text-center py-12">
+              <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-primary/10 text-primary">
+                <Plane className="h-6 w-6" />
+              </div>
+              <CardTitle className="mt-4 text-lg">No passport details added yet</CardTitle>
+              <p className="mt-2 text-sm text-muted-foreground max-w-sm mx-auto">
+                No active passport record found for this employee.
+              </p>
+              {canEdit && (
+                <div className="mt-6">
+                  <Button onClick={() => setIsPassportDialogOpen(true)} className="gap-2" size="sm">
+                    <PlusCircle className="h-4 w-4" />
+                    <span>Add Passport</span>
+                  </Button>
+                </div>
+              )}
+            </Card>
+          ) : (
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between pb-4 border-b">
+                <div className="flex items-center gap-3">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                    <Plane className="h-5 w-5" />
+                  </div>
+                  <div>
+                    <CardTitle className="text-base font-semibold">Passport Document</CardTitle>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      Official international travel identification
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-3">
+                  <Badge variant={DOCUMENT_STATUS_CONFIG[passport.status].variant}>
+                    {DOCUMENT_STATUS_CONFIG[passport.status].label}
+                  </Badge>
+                  {canEdit && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setIsPassportDialogOpen(true)}
+                      className="gap-1.5"
+                    >
+                      <Edit className="h-3.5 w-3.5" />
+                      <span>Edit</span>
+                    </Button>
+                  )}
+                </div>
+              </CardHeader>
+              <CardContent className="pt-6">
+                <dl className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6 text-sm">
+                  <div>
+                    <dt className="text-xs text-muted-foreground uppercase font-medium">Passport Number</dt>
+                    <dd className="mt-1 font-mono font-medium text-foreground">{passport.passportNumber}</dd>
+                  </div>
+                  <div>
+                    <dt className="text-xs text-muted-foreground uppercase font-medium">Nationality / Issuing State</dt>
+                    <dd className="mt-1 font-medium text-foreground">{passport.nationality}</dd>
+                  </div>
+                  <div>
+                    <dt className="text-xs text-muted-foreground uppercase font-medium">Place of Issue</dt>
+                    <dd className="mt-1 font-medium text-foreground">{passport.placeOfIssue || "—"}</dd>
+                  </div>
+                  <div>
+                    <dt className="text-xs text-muted-foreground uppercase font-medium">Issue Date</dt>
+                    <dd className="mt-1 font-medium text-foreground">{passport.issueDate}</dd>
+                  </div>
+                  <div>
+                    <dt className="text-xs text-muted-foreground uppercase font-medium">Expiry Date</dt>
+                    <dd className="mt-1 font-medium text-foreground">{passport.expiryDate}</dd>
+                  </div>
+                  <div>
+                    <dt className="text-xs text-muted-foreground uppercase font-medium">Status Calculation</dt>
+                    <dd className="mt-1 font-medium text-foreground">{DOCUMENT_STATUS_CONFIG[passport.status].label}</dd>
+                  </div>
+                </dl>
+              </CardContent>
+            </Card>
+          )}
+        </div>
       )}
 
+      {/* Tab Contents: Visa (Functional) */}
       {activeTab === "visa" && (
-        <Card className="border-dashed text-center py-12">
-          <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-primary/10 text-primary">
-            <FileText className="h-6 w-6" />
-          </div>
-          <CardTitle className="mt-4 text-lg">Visa Details</CardTitle>
-          <p className="mt-2 text-sm text-muted-foreground max-w-sm mx-auto">
-            Visa number, type, sponsor, and visa expiry tracking will be available in the upcoming phase.
-          </p>
-        </Card>
+        <div>
+          {isVisaLoading ? (
+            <div className="flex min-h-[200px] items-center justify-center p-8">
+              <Loader2 className="h-6 w-6 animate-spin text-primary" />
+            </div>
+          ) : !visa ? (
+            <Card className="border-dashed text-center py-12">
+              <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-primary/10 text-primary">
+                <FileText className="h-6 w-6" />
+              </div>
+              <CardTitle className="mt-4 text-lg">No visa details added yet</CardTitle>
+              <p className="mt-2 text-sm text-muted-foreground max-w-sm mx-auto">
+                No active visa record found for this employee.
+              </p>
+              {canEdit && (
+                <div className="mt-6">
+                  <Button onClick={() => setIsVisaDialogOpen(true)} className="gap-2" size="sm">
+                    <PlusCircle className="h-4 w-4" />
+                    <span>Add Visa</span>
+                  </Button>
+                </div>
+              )}
+            </Card>
+          ) : (
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between pb-4 border-b">
+                <div className="flex items-center gap-3">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                    <FileText className="h-5 w-5" />
+                  </div>
+                  <div>
+                    <CardTitle className="text-base font-semibold">Visa Record</CardTitle>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      Entry permit and residence status authorization
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-3">
+                  <Badge variant={DOCUMENT_STATUS_CONFIG[visa.status].variant}>
+                    {DOCUMENT_STATUS_CONFIG[visa.status].label}
+                  </Badge>
+                  {canEdit && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setIsVisaDialogOpen(true)}
+                      className="gap-1.5"
+                    >
+                      <Edit className="h-3.5 w-3.5" />
+                      <span>Edit</span>
+                    </Button>
+                  )}
+                </div>
+              </CardHeader>
+              <CardContent className="pt-6">
+                <dl className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6 text-sm">
+                  <div>
+                    <dt className="text-xs text-muted-foreground uppercase font-medium">Visa / UID Number</dt>
+                    <dd className="mt-1 font-mono font-medium text-foreground">{visa.visaNumber}</dd>
+                  </div>
+                  <div>
+                    <dt className="text-xs text-muted-foreground uppercase font-medium">Visa Type</dt>
+                    <dd className="mt-1 font-medium text-foreground">{visa.visaType}</dd>
+                  </div>
+                  <div>
+                    <dt className="text-xs text-muted-foreground uppercase font-medium">Issuing State / Emirate</dt>
+                    <dd className="mt-1 font-medium text-foreground">{visa.issuingState || "—"}</dd>
+                  </div>
+                  <div>
+                    <dt className="text-xs text-muted-foreground uppercase font-medium">Profession on Visa</dt>
+                    <dd className="mt-1 font-medium text-foreground">{visa.profession || "—"}</dd>
+                  </div>
+                  <div>
+                    <dt className="text-xs text-muted-foreground uppercase font-medium">Issue Date</dt>
+                    <dd className="mt-1 font-medium text-foreground">{visa.issueDate}</dd>
+                  </div>
+                  <div>
+                    <dt className="text-xs text-muted-foreground uppercase font-medium">Expiry Date</dt>
+                    <dd className="mt-1 font-medium text-foreground">{visa.expiryDate}</dd>
+                  </div>
+                  <div className="sm:col-span-2">
+                    <dt className="text-xs text-muted-foreground uppercase font-medium">Sponsor Name</dt>
+                    <dd className="mt-1 font-medium text-foreground">{visa.sponsorName || "—"}</dd>
+                  </div>
+                  <div>
+                    <dt className="text-xs text-muted-foreground uppercase font-medium">Status Calculation</dt>
+                    <dd className="mt-1 font-medium text-foreground">{DOCUMENT_STATUS_CONFIG[visa.status].label}</dd>
+                  </div>
+                </dl>
+              </CardContent>
+            </Card>
+          )}
+        </div>
       )}
 
+      {/* Tab Contents: Work Permit (Functional) */}
       {activeTab === "work_permit" && (
-        <Card className="border-dashed text-center py-12">
-          <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-primary/10 text-primary">
-            <CreditCard className="h-6 w-6" />
-          </div>
-          <CardTitle className="mt-4 text-lg">Work Permit Details</CardTitle>
-          <p className="mt-2 text-sm text-muted-foreground max-w-sm mx-auto">
-            Work permit / labor card details and renewal workflows will be available in the upcoming phase.
-          </p>
-        </Card>
+        <div>
+          {isWorkPermitLoading ? (
+            <div className="flex min-h-[200px] items-center justify-center p-8">
+              <Loader2 className="h-6 w-6 animate-spin text-primary" />
+            </div>
+          ) : !workPermit ? (
+            <Card className="border-dashed text-center py-12">
+              <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-primary/10 text-primary">
+                <CreditCard className="h-6 w-6" />
+              </div>
+              <CardTitle className="mt-4 text-lg">No work permit details added yet</CardTitle>
+              <p className="mt-2 text-sm text-muted-foreground max-w-sm mx-auto">
+                No active labor card / work permit record found for this employee.
+              </p>
+              {canEdit && (
+                <div className="mt-6">
+                  <Button onClick={() => setIsWorkPermitDialogOpen(true)} className="gap-2" size="sm">
+                    <PlusCircle className="h-4 w-4" />
+                    <span>Add Work Permit</span>
+                  </Button>
+                </div>
+              )}
+            </Card>
+          ) : (
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between pb-4 border-b">
+                <div className="flex items-center gap-3">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                    <CreditCard className="h-5 w-5" />
+                  </div>
+                  <div>
+                    <CardTitle className="text-base font-semibold">Work Permit / Labor Card</CardTitle>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      Statutory employment authorization details
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-3">
+                  <Badge variant={DOCUMENT_STATUS_CONFIG[workPermit.status].variant}>
+                    {DOCUMENT_STATUS_CONFIG[workPermit.status].label}
+                  </Badge>
+                  {canEdit && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setIsWorkPermitDialogOpen(true)}
+                      className="gap-1.5"
+                    >
+                      <Edit className="h-3.5 w-3.5" />
+                      <span>Edit</span>
+                    </Button>
+                  )}
+                </div>
+              </CardHeader>
+              <CardContent className="pt-6">
+                <dl className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6 text-sm">
+                  <div>
+                    <dt className="text-xs text-muted-foreground uppercase font-medium">Permit / Card Number</dt>
+                    <dd className="mt-1 font-mono font-medium text-foreground">{workPermit.permitNumber}</dd>
+                  </div>
+                  <div>
+                    <dt className="text-xs text-muted-foreground uppercase font-medium">Profession</dt>
+                    <dd className="mt-1 font-medium text-foreground">{workPermit.profession || "—"}</dd>
+                  </div>
+                  <div>
+                    <dt className="text-xs text-muted-foreground uppercase font-medium">Status Calculation</dt>
+                    <dd className="mt-1 font-medium text-foreground">{DOCUMENT_STATUS_CONFIG[workPermit.status].label}</dd>
+                  </div>
+                  <div>
+                    <dt className="text-xs text-muted-foreground uppercase font-medium">Issue Date</dt>
+                    <dd className="mt-1 font-medium text-foreground">{workPermit.issueDate}</dd>
+                  </div>
+                  <div>
+                    <dt className="text-xs text-muted-foreground uppercase font-medium">Expiry Date</dt>
+                    <dd className="mt-1 font-medium text-foreground">{workPermit.expiryDate}</dd>
+                  </div>
+                </dl>
+              </CardContent>
+            </Card>
+          )}
+        </div>
       )}
 
+      {/* Tab Contents: Documents (Placeholder for Next Phase) */}
       {activeTab === "documents" && (
         <Card className="border-dashed text-center py-12">
           <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-primary/10 text-primary">
@@ -471,6 +735,39 @@ export const EmployeeProfile: React.FC<EmployeeProfileProps> = ({
           onClose={() => setIsEditDialogOpen(false)}
           employeeToEdit={employee}
           onSuccess={() => refetch()}
+        />
+      )}
+
+      {/* Passport Dialog */}
+      {isPassportDialogOpen && (
+        <PassportDialog
+          isOpen={isPassportDialogOpen}
+          onClose={() => setIsPassportDialogOpen(false)}
+          employeeId={effectiveId}
+          existingData={passport}
+          defaultNationality={employee.nationality}
+        />
+      )}
+
+      {/* Visa Dialog */}
+      {isVisaDialogOpen && (
+        <VisaDialog
+          isOpen={isVisaDialogOpen}
+          onClose={() => setIsVisaDialogOpen(false)}
+          employeeId={effectiveId}
+          existingData={visa}
+          defaultProfession={employee.designation?.name}
+        />
+      )}
+
+      {/* Work Permit Dialog */}
+      {isWorkPermitDialogOpen && (
+        <WorkPermitDialog
+          isOpen={isWorkPermitDialogOpen}
+          onClose={() => setIsWorkPermitDialogOpen(false)}
+          employeeId={effectiveId}
+          existingData={workPermit}
+          defaultProfession={employee.designation?.name}
         />
       )}
     </div>

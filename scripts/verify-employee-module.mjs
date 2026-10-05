@@ -58,13 +58,15 @@ async function runTests() {
   const employeeToken = loginEmployee.data?.data?.token;
   assert(loginEmployee.status === 200 && employeeToken, "Auth: EMPLOYEE login successful");
 
+  const runId = Date.now().toString().slice(-6);
+
   // 2. Test 1: ADMIN can create employee
   const adminCreate = await request("/employees", {
     method: "POST",
     headers: { Authorization: `Bearer ${adminToken}` },
     body: JSON.stringify({
-      employeeCode: "ADM-EMP-01",
-      employeeId: "ID-ADM-01",
+      employeeCode: `ADM-${runId}`,
+      employeeId: `ID-ADM-${runId}`,
       fullName: "Admin Created Employee",
       joiningDate: "2026-03-01",
       employmentStatus: "active",
@@ -78,8 +80,8 @@ async function runTests() {
     method: "POST",
     headers: { Authorization: `Bearer ${hrToken}` },
     body: JSON.stringify({
-      employeeCode: "HR-EMP-01",
-      employeeId: "ID-HR-01",
+      employeeCode: `HR-${runId}`,
+      employeeId: `ID-HR-${runId}`,
       fullName: "HR Created Employee",
       joiningDate: "2026-03-02",
       employmentStatus: "active",

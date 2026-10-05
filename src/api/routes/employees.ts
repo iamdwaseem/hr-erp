@@ -16,10 +16,15 @@ import {
 import type { Employee, EmployeeListItem } from "../../shared/types/employee";
 import { jsonSuccess, jsonError } from "../utils/response";
 
+import { employeeDocumentsRoutes } from "./employee-documents";
+
 export const employeesRoutes = new Hono<AppContext>();
 
 // All employee routes require authentication
 employeesRoutes.use("*", requireAuth());
+
+// Mount Passport, Visa, and Work Permit subroutes
+employeesRoutes.route("/", employeeDocumentsRoutes);
 
 /**
  * GET /api/employees
