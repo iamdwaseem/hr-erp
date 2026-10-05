@@ -229,6 +229,22 @@ export function ActionCenterView({
           <p className="mt-1 text-xs text-muted-foreground max-w-sm mx-auto">
             All document records match valid status or no records matched the selected filter criteria.
           </p>
+          {(searchTerm || selectedDocType !== "all" || selectedDept !== "all" || selectedBranch !== "all" || selectedStatus !== "all") && (
+            <Button
+              variant="outline"
+              size="sm"
+              className="mt-3 text-xs"
+              onClick={() => {
+                setSearchTerm("");
+                setSelectedStatus("all");
+                setSelectedDocType("all");
+                setSelectedDept("all");
+                setSelectedBranch("all");
+              }}
+            >
+              Clear Filters
+            </Button>
+          )}
         </Card>
       ) : (
         <>

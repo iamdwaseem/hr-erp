@@ -7,7 +7,7 @@ import { DashboardPage } from "./pages/dashboard";
 import { EmployeesPage } from "./pages/employees";
 import { EmployeeProfile, type ProfileTabType } from "./pages/employees/employee-profile";
 import { ActionCenterPage } from "./pages/action-center";
-import { ModulePlaceholder } from "./pages/module-placeholder";
+import { AuditLogPage } from "./pages/audit-log";
 import { NotFoundPage } from "./pages/not-found";
 import { AppLayout } from "./components/layout/app-layout";
 import { ProtectedRoute } from "./components/layout/protected-route";
@@ -88,15 +88,13 @@ const AppContent: React.FC = () => {
           title: "HR Action Center",
           component: <ActionCenterPage onViewEmployee={handleViewEmployee} />,
         };
+      case "/audit-log":
       case "/audit":
         return {
-          title: "Basic Audit Log",
+          title: "Audit Log Viewer",
           component: (
             <ProtectedRoute requiredPermission={PERMISSIONS.AUDIT_READ}>
-              <ModulePlaceholder
-                title="Basic Audit Log"
-                description="Chronological log of administrative actions, logins, and document mutations will be implemented in subsequent phases."
-              />
+              <AuditLogPage />
             </ProtectedRoute>
           ),
         };

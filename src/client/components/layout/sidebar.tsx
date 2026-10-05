@@ -41,8 +41,8 @@ const navItems: NavItem[] = [
     excludeRoles: [ROLES.EMPLOYEE],
   },
   {
-    title: "Basic Audit Log",
-    href: "/audit",
+    title: "Audit Log",
+    href: "/audit-log",
     icon: History,
     permission: PERMISSIONS.AUDIT_READ,
     excludeRoles: [ROLES.EMPLOYEE],
@@ -110,7 +110,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
         <nav className="flex-1 space-y-1 p-4 overflow-y-auto">
           {filteredItems.map((item) => {
             const Icon = item.icon;
-            const isActive = currentPath === item.href;
+            const isActive =
+              currentPath === item.href ||
+              (item.href === "/audit-log" && currentPath === "/audit");
 
             return (
               <button

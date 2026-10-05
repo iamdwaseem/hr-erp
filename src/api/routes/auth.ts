@@ -3,7 +3,7 @@ import { eq } from "drizzle-orm";
 import type { AppContext } from "../types";
 import { loginSchema } from "../../shared/schemas/auth";
 import { jsonSuccess, jsonError } from "../utils/response";
-import { signJwt } from "../utils/jwt";
+import { signJwt, verifyJwt } from "../utils/jwt";
 import { requireAuth } from "../middleware/auth";
 import { getDb } from "../db/client";
 import { users } from "../db/schema/users";
@@ -192,6 +192,31 @@ authRoutes.get("/me", requireAuth(), async (c) => {
   });
 });
 
-authRoutes.post("/logout", (c) => {
+authRoutes.post("/logout", async (c) => {
+  try {
+    const authHeader = c.req.header("Authorization");
+    if (authHeader && authHeader.startsWith("Bearer ")) {
+      const token = authHeader.substring(7);
+      const payload = await verifyJwt(
+        token,
+        c.env.JWT_SECRET || "hr-erp-default-jwt-secret-key-32-chars-minimum"
+      );
+      if (payload) {
+        const db = getDb(c.env.DB);
+        await db.insert(auditLogs).values({
+          id: crypto.randomUUID(),
+          userId: payload.sub,
+          action: "LOGOUT",
+          resourceType: "auth",
+          resourceId: payload.sub,
+          ipAddress: c.req.header("cf-connecting-ip") || "127.0.0.1",
+          userAgent: c.req.header("user-agent") || "unknown",
+          createdAt: new Date().toISOString(),
+        });
+      }
+    }
+  } catch {
+    // Non-blocking
+  }
   return jsonSuccess(c, { message: "Logged out successfully" });
 });

@@ -1,4 +1,4 @@
-import type { ApiResponse } from "../../shared/types/api";
+import type { ApiResponse, ApiMeta } from "../../shared/types/api";
 
 export class ApiClientError extends Error {
   public status: number;
@@ -98,9 +98,71 @@ async function request<T>(endpoint: string, options: RequestOptions = {}): Promi
   return data.data as T;
 }
 
+async function requestWithMeta<T>(
+  endpoint: string,
+  options: RequestOptions = {}
+): Promise<{ data: T; meta?: ApiMeta }> {
+  const { params, headers, ...restOptions } = options;
+
+  let url = endpoint.startsWith("http")
+    ? endpoint
+    : `/api${endpoint.startsWith("/") ? endpoint : `/${endpoint}`}`;
+
+  if (params) {
+    const searchParams = new URLSearchParams();
+    Object.entries(params).forEach(([key, value]) => {
+      if (value !== undefined && value !== null) {
+        searchParams.append(key, String(value));
+      }
+    });
+    const queryString = searchParams.toString();
+    if (queryString) {
+      url += (url.includes("?") ? "&" : "?") + queryString;
+    }
+  }
+
+  const token = authStorage.getToken();
+  const requestHeaders = new Headers(headers);
+
+  if (token && !requestHeaders.has("Authorization")) {
+    requestHeaders.set("Authorization", `Bearer ${token}`);
+  }
+
+  if (!requestHeaders.has("Content-Type") && !(restOptions.body instanceof FormData)) {
+    requestHeaders.set("Content-Type", "application/json");
+  }
+
+  const response = await fetch(url, {
+    ...restOptions,
+    headers: requestHeaders,
+  });
+
+  let data: ApiResponse<T>;
+  try {
+    data = await response.json();
+  } catch {
+    throw new ApiClientError(
+      response.status,
+      "PARSE_ERROR",
+      `Failed to parse response from server (${response.status} ${response.statusText})`
+    );
+  }
+
+  if (!response.ok || !data.success) {
+    const code = data.error?.code || `HTTP_${response.status}`;
+    const message = data.error?.message || response.statusText || "Request failed";
+    throw new ApiClientError(response.status, code, message, data.error?.details);
+  }
+
+  return { data: data.data as T, meta: data.meta };
+}
+
 export const apiClient = {
   get: <T>(endpoint: string, options?: RequestOptions) =>
     request<T>(endpoint, { ...options, method: "GET" }),
+
+  getWithMeta: <T>(endpoint: string, options?: RequestOptions) =>
+    requestWithMeta<T>(endpoint, { ...options, method: "GET" }),
 
   post: <T>(endpoint: string, body?: unknown, options?: RequestOptions) =>
     request<T>(endpoint, {
