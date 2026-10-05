@@ -11,6 +11,7 @@ import {
 } from "../../shared/schemas/document";
 import {
   calculateDocumentStatus,
+  calculateDaysRemaining,
   type EmployeeDocument,
   type DocumentType,
 } from "../../shared/types/document";
@@ -109,6 +110,7 @@ function formatDocumentResponse(doc: typeof employeeDocuments.$inferSelect): Emp
     fileSize: doc.fileSize,
     verificationStatus: doc.verificationStatus as EmployeeDocument["verificationStatus"],
     status: doc.expiryDate ? calculateDocumentStatus(doc.expiryDate) : null,
+    daysRemaining: doc.expiryDate ? calculateDaysRemaining(doc.expiryDate) : null,
     uploadedBy: doc.uploadedBy,
     createdAt: doc.createdAt,
     updatedAt: doc.updatedAt,

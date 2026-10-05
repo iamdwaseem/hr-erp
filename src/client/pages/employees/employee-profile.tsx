@@ -38,12 +38,7 @@ import { VisaDialog } from "./visa-dialog";
 import { WorkPermitDialog } from "./work-permit-dialog";
 import { DocumentVaultTab } from "./document-vault-tab";
 
-interface EmployeeProfileProps {
-  employeeId: string;
-  onBack?: () => void;
-}
-
-type TabType =
+export type ProfileTabType =
   | "overview"
   | "personal"
   | "employment"
@@ -52,12 +47,19 @@ type TabType =
   | "work_permit"
   | "documents";
 
+interface EmployeeProfileProps {
+  employeeId: string;
+  onBack?: () => void;
+  initialTab?: ProfileTabType;
+}
+
 export const EmployeeProfile: React.FC<EmployeeProfileProps> = ({
   employeeId,
   onBack,
+  initialTab = "overview",
 }) => {
   const { user, hasRole } = useAuth();
-  const [activeTab, setActiveTab] = useState<TabType>("overview");
+  const [activeTab, setActiveTab] = useState<ProfileTabType>(initialTab);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
 
   // Document Dialog states
@@ -247,14 +249,14 @@ export const EmployeeProfile: React.FC<EmployeeProfileProps> = ({
             { id: "passport", label: "Passport", icon: Plane },
             { id: "visa", label: "Visa", icon: FileText },
             { id: "work_permit", label: "Work Permit", icon: CreditCard },
-            { id: "documents", label: "Documents", icon: FileCheck2, comingSoon: true },
+            { id: "documents", label: "Documents", icon: FileCheck2 },
           ].map((tab) => {
             const Icon = tab.icon;
             const isActive = activeTab === tab.id;
             return (
               <button
                 key={tab.id}
-                onClick={() => setActiveTab(tab.id as TabType)}
+                onClick={() => setActiveTab(tab.id as ProfileTabType)}
                 className={`flex items-center gap-2 border-b-2 px-4 py-2.5 text-sm font-medium transition-colors whitespace-nowrap ${
                   isActive
                     ? "border-primary text-primary"
@@ -263,11 +265,6 @@ export const EmployeeProfile: React.FC<EmployeeProfileProps> = ({
               >
                 <Icon className="h-4 w-4" />
                 <span>{tab.label}</span>
-                {tab.comingSoon && (
-                  <span className="rounded bg-muted px-1.5 py-0.2 text-[10px] text-muted-foreground font-normal">
-                    Next Phase
-                  </span>
-                )}
               </button>
             );
           })}
@@ -522,8 +519,17 @@ export const EmployeeProfile: React.FC<EmployeeProfileProps> = ({
                     <dd className="mt-1 font-medium text-foreground">{passport.expiryDate}</dd>
                   </div>
                   <div>
-                    <dt className="text-xs text-muted-foreground uppercase font-medium">Status Calculation</dt>
-                    <dd className="mt-1 font-medium text-foreground">{DOCUMENT_STATUS_CONFIG[passport.status].label}</dd>
+                    <dt className="text-xs text-muted-foreground uppercase font-medium">Status / Days Remaining</dt>
+                    <dd className="mt-1 font-medium text-foreground flex items-center gap-1.5 flex-wrap">
+                      <span>{DOCUMENT_STATUS_CONFIG[passport.status].label}</span>
+                      {passport.daysRemaining !== undefined && passport.daysRemaining !== null && (
+                        <span className="text-xs text-muted-foreground">
+                          ({passport.daysRemaining < 0
+                            ? `Expired ${Math.abs(passport.daysRemaining)}d ago`
+                            : `${passport.daysRemaining} days remaining`})
+                        </span>
+                      )}
+                    </dd>
                   </div>
                 </dl>
               </CardContent>
@@ -620,8 +626,17 @@ export const EmployeeProfile: React.FC<EmployeeProfileProps> = ({
                     <dd className="mt-1 font-medium text-foreground">{visa.sponsorName || "—"}</dd>
                   </div>
                   <div>
-                    <dt className="text-xs text-muted-foreground uppercase font-medium">Status Calculation</dt>
-                    <dd className="mt-1 font-medium text-foreground">{DOCUMENT_STATUS_CONFIG[visa.status].label}</dd>
+                    <dt className="text-xs text-muted-foreground uppercase font-medium">Status / Days Remaining</dt>
+                    <dd className="mt-1 font-medium text-foreground flex items-center gap-1.5 flex-wrap">
+                      <span>{DOCUMENT_STATUS_CONFIG[visa.status].label}</span>
+                      {visa.daysRemaining !== undefined && visa.daysRemaining !== null && (
+                        <span className="text-xs text-muted-foreground">
+                          ({visa.daysRemaining < 0
+                            ? `Expired ${Math.abs(visa.daysRemaining)}d ago`
+                            : `${visa.daysRemaining} days remaining`})
+                        </span>
+                      )}
+                    </dd>
                   </div>
                 </dl>
               </CardContent>
@@ -698,8 +713,17 @@ export const EmployeeProfile: React.FC<EmployeeProfileProps> = ({
                     <dd className="mt-1 font-medium text-foreground">{workPermit.profession || "—"}</dd>
                   </div>
                   <div>
-                    <dt className="text-xs text-muted-foreground uppercase font-medium">Status Calculation</dt>
-                    <dd className="mt-1 font-medium text-foreground">{DOCUMENT_STATUS_CONFIG[workPermit.status].label}</dd>
+                    <dt className="text-xs text-muted-foreground uppercase font-medium">Status / Days Remaining</dt>
+                    <dd className="mt-1 font-medium text-foreground flex items-center gap-1.5 flex-wrap">
+                      <span>{DOCUMENT_STATUS_CONFIG[workPermit.status].label}</span>
+                      {workPermit.daysRemaining !== undefined && workPermit.daysRemaining !== null && (
+                        <span className="text-xs text-muted-foreground">
+                          ({workPermit.daysRemaining < 0
+                            ? `Expired ${Math.abs(workPermit.daysRemaining)}d ago`
+                            : `${workPermit.daysRemaining} days remaining`})
+                        </span>
+                      )}
+                    </dd>
                   </div>
                   <div>
                     <dt className="text-xs text-muted-foreground uppercase font-medium">Issue Date</dt>

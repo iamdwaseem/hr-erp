@@ -5,7 +5,8 @@ import { AuthProvider, useAuth } from "./context/auth-context";
 import { LoginPage } from "./pages/login";
 import { DashboardPage } from "./pages/dashboard";
 import { EmployeesPage } from "./pages/employees";
-import { EmployeeProfile } from "./pages/employees/employee-profile";
+import { EmployeeProfile, type ProfileTabType } from "./pages/employees/employee-profile";
+import { ActionCenterPage } from "./pages/action-center";
 import { ModulePlaceholder } from "./pages/module-placeholder";
 import { NotFoundPage } from "./pages/not-found";
 import { AppLayout } from "./components/layout/app-layout";
@@ -15,6 +16,13 @@ import { PERMISSIONS, ROLES } from "../shared/constants/roles";
 const AppContent: React.FC = () => {
   const { user, isAuthenticated, isLoading } = useAuth();
   const [currentPath, setCurrentPath] = useState<string>("/dashboard");
+  const [viewEmployeeId, setViewEmployeeId] = useState<string | null>(null);
+  const [viewEmployeeTab, setViewEmployeeTab] = useState<ProfileTabType | undefined>(undefined);
+
+  const handleViewEmployee = (employeeId: string, initialTab?: ProfileTabType) => {
+    setViewEmployeeId(employeeId);
+    setViewEmployeeTab(initialTab);
+  };
 
   // If logged in as an EMPLOYEE, default path to /profile instead of /dashboard or /employees
   useEffect(() => {
@@ -35,12 +43,31 @@ const AppContent: React.FC = () => {
     return <LoginPage />;
   }
 
+  if (viewEmployeeId) {
+    return (
+      <AppLayout
+        currentPath={currentPath}
+        onNavigate={(path) => {
+          setViewEmployeeId(null);
+          setCurrentPath(path);
+        }}
+        pageTitle="Employee Profile"
+      >
+        <EmployeeProfile
+          employeeId={viewEmployeeId}
+          initialTab={viewEmployeeTab}
+          onBack={() => setViewEmployeeId(null)}
+        />
+      </AppLayout>
+    );
+  }
+
   const getPageInfo = () => {
     switch (currentPath) {
       case "/dashboard":
         return {
           title: "HR Dashboard",
-          component: <DashboardPage />,
+          component: <DashboardPage onViewEmployee={handleViewEmployee} />,
         };
       case "/profile":
         return {
@@ -59,12 +86,7 @@ const AppContent: React.FC = () => {
       case "/action-center":
         return {
           title: "HR Action Center",
-          component: (
-            <ModulePlaceholder
-              title="HR Action Center"
-              description="Document Expiry Tracking, alert badges, and pending HR action queues will be implemented in subsequent phases."
-            />
-          ),
+          component: <ActionCenterPage onViewEmployee={handleViewEmployee} />,
         };
       case "/audit":
         return {

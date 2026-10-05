@@ -68,6 +68,23 @@ export function calculateDocumentStatus(
   return DOCUMENT_STATUSES.VALID;
 }
 
+export function calculateDaysRemaining(
+  expiryDateStr: string | null | undefined,
+  referenceDate: Date = new Date()
+): number | null {
+  if (!expiryDateStr) return null;
+
+  const expiry = new Date(expiryDateStr);
+  if (isNaN(expiry.getTime())) return null;
+
+  const ref = new Date(referenceDate);
+  ref.setHours(0, 0, 0, 0);
+  expiry.setHours(0, 0, 0, 0);
+
+  const diffMs = expiry.getTime() - ref.getTime();
+  return Math.round(diffMs / (1000 * 60 * 60 * 24));
+}
+
 export interface EmployeePassport {
   id: string;
   employeeId: string;
@@ -77,6 +94,7 @@ export interface EmployeePassport {
   expiryDate: string;
   placeOfIssue: string | null;
   status: DocumentStatus;
+  daysRemaining?: number | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -92,6 +110,7 @@ export interface EmployeeVisa {
   expiryDate: string;
   sponsorName: string | null;
   status: DocumentStatus;
+  daysRemaining?: number | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -104,6 +123,7 @@ export interface EmployeeWorkPermit {
   issueDate: string;
   expiryDate: string;
   status: DocumentStatus;
+  daysRemaining?: number | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -169,6 +189,7 @@ export interface EmployeeDocument {
   fileSize: number;
   verificationStatus: DocumentVerificationStatus;
   status?: DocumentStatus | null;
+  daysRemaining?: number | null;
   uploadedBy: string;
   createdAt: string;
   updatedAt: string;

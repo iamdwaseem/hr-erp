@@ -1,39 +1,43 @@
 import React from "react";
-import { useQuery } from "@tanstack/react-query";
-import { Server, Database, HardDrive, ShieldCheck, CheckCircle2, AlertTriangle } from "lucide-react";
 import { useAuth } from "../hooks/use-auth";
-import { apiClient } from "../lib/api-client";
-import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "../components/ui/card";
+import { useExpirySummary } from "../hooks/use-expiry";
+import type { ProfileTabType } from "./employees/employee-profile";
+import { ActionCenterView } from "./action-center/action-center-view";
+import { Card, CardHeader, CardTitle, CardContent } from "../components/ui/card";
 import { Badge } from "../components/ui/badge";
+import {
+  Users,
+  UserCheck,
+  UserMinus,
+  AlertCircle,
+  Clock,
+  Plane as PassportIcon,
+  CreditCard,
+  FileText,
+  Files,
+  Loader2,
+} from "lucide-react";
 
-interface HealthCheckData {
-  status: string;
-  service: string;
-  environment: string;
-  bindings: {
-    d1: string;
-    r2: string;
-  };
+interface DashboardPageProps {
+  onViewEmployee?: (employeeId: string, initialTab?: ProfileTabType) => void;
 }
 
-export const DashboardPage: React.FC = () => {
+export const DashboardPage: React.FC<DashboardPageProps> = ({
+  onViewEmployee,
+}) => {
   const { user } = useAuth();
-
-  const { data: health, isLoading: isHealthLoading } = useQuery<HealthCheckData>({
-    queryKey: ["health"],
-    queryFn: () => apiClient.get<HealthCheckData>("/health"),
-  });
+  const { data: summary, isLoading: isSummaryLoading } = useExpirySummary();
 
   return (
     <div className="space-y-6">
-      {/* Header welcome banner */}
+      {/* Welcome Banner */}
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h2 className="text-2xl font-bold tracking-tight text-foreground">
             Welcome back, {user?.fullName}
           </h2>
           <p className="text-sm text-muted-foreground">
-            Core HR ERP Platform is active on Cloudflare Workers Edge.
+            HR Compliance, Workforce Overview & Document Expiry Tracking
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -44,111 +48,244 @@ export const DashboardPage: React.FC = () => {
         </div>
       </div>
 
-      {/* Infrastructure & Stack Readiness Cards */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        {/* Worker Runtime */}
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
-            <CardTitle className="text-sm font-medium">Edge Runtime</CardTitle>
-            <Server className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-xl font-bold text-foreground">Cloudflare Worker</div>
-            <p className="text-xs text-muted-foreground mt-1 flex items-center gap-1">
-              <CheckCircle2 className="h-3 w-3 text-emerald-500 inline" />
-              Hono v4 Framework
-            </p>
-          </CardContent>
-        </Card>
+      {/* 1. Workforce Summary Cards */}
+      <div>
+        <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3">
+          Workforce Status
+        </h3>
+        <div className="grid gap-4 grid-cols-1 sm:grid-cols-3">
+          {/* Total Employees */}
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
+              <CardTitle className="text-xs font-medium text-muted-foreground">
+                Total Employees
+              </CardTitle>
+              <Users className="h-4 w-4 text-primary" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-foreground">
+                {isSummaryLoading ? (
+                  <Loader2 className="h-5 w-5 animate-spin" />
+                ) : (
+                  summary?.workforce.totalEmployees ?? 0
+                )}
+              </div>
+              <p className="text-xs text-muted-foreground mt-1">Headcount registered</p>
+            </CardContent>
+          </Card>
 
-        {/* Cloudflare D1 */}
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
-            <CardTitle className="text-sm font-medium">Database</CardTitle>
-            <Database className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-xl font-bold text-foreground">Cloudflare D1</div>
-            <p className="text-xs text-muted-foreground mt-1 flex items-center gap-1">
-              {isHealthLoading ? (
-                <span>Checking...</span>
-              ) : health?.bindings?.d1 === "connected" ? (
-                <>
-                  <CheckCircle2 className="h-3 w-3 text-emerald-500 inline" />
-                  Drizzle ORM Connected
-                </>
-              ) : (
-                <>
-                  <AlertTriangle className="h-3 w-3 text-amber-500 inline" />
-                  Status: {health?.bindings?.d1 || "Configured"}
-                </>
-              )}
-            </p>
-          </CardContent>
-        </Card>
+          {/* Active Employees */}
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
+              <CardTitle className="text-xs font-medium text-muted-foreground">
+                Active Workforce
+              </CardTitle>
+              <UserCheck className="h-4 w-4 text-emerald-500" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-emerald-600">
+                {isSummaryLoading ? (
+                  <Loader2 className="h-5 w-5 animate-spin" />
+                ) : (
+                  summary?.workforce.activeEmployees ?? 0
+                )}
+              </div>
+              <p className="text-xs text-muted-foreground mt-1">Active & on-probation</p>
+            </CardContent>
+          </Card>
 
-        {/* Cloudflare R2 */}
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
-            <CardTitle className="text-sm font-medium">Object Storage</CardTitle>
-            <HardDrive className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-xl font-bold text-foreground">Cloudflare R2</div>
-            <p className="text-xs text-muted-foreground mt-1 flex items-center gap-1">
-              <CheckCircle2 className="h-3 w-3 text-emerald-500 inline" />
-              Bucket Binding Ready
-            </p>
-          </CardContent>
-        </Card>
-
-        {/* RBAC Security */}
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
-            <CardTitle className="text-sm font-medium">Security & RBAC</CardTitle>
-            <ShieldCheck className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-xl font-bold text-foreground">Active</div>
-            <p className="text-xs text-muted-foreground mt-1 flex items-center gap-1">
-              <CheckCircle2 className="h-3 w-3 text-emerald-500 inline" />
-              Role Enforcement Enabled
-            </p>
-          </CardContent>
-        </Card>
+          {/* Inactive Employees */}
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
+              <CardTitle className="text-xs font-medium text-muted-foreground">
+                Inactive / Departed
+              </CardTitle>
+              <UserMinus className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-foreground">
+                {isSummaryLoading ? (
+                  <Loader2 className="h-5 w-5 animate-spin" />
+                ) : (
+                  summary?.workforce.inactiveEmployees ?? 0
+                )}
+              </div>
+              <p className="text-xs text-muted-foreground mt-1">Resigned or terminated</p>
+            </CardContent>
+          </Card>
+        </div>
       </div>
 
-      {/* Baseline Module Scaffold Information */}
-      <Card>
-        <CardHeader>
-          <CardTitle>System Architecture Status</CardTitle>
-          <CardDescription>
-            Core foundation and abstractions are verified and ready for business module implementation.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="grid gap-4 md:grid-cols-3">
-            <div className="rounded-lg border p-4">
-              <h4 className="font-semibold text-sm mb-1">Architecture Base</h4>
-              <p className="text-xs text-muted-foreground">
-                Hono routing, Drizzle D1 schema, error handling middleware, request ID tracking, and edge JWT.
-              </p>
+      {/* 2. Document Compliance Cards */}
+      <div>
+        <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3">
+          Document Expiry & Compliance
+        </h3>
+        <div className="grid gap-4 grid-cols-2 md:grid-cols-4">
+          {/* Expired */}
+          <Card className="border-destructive/30 bg-destructive/5">
+            <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
+              <CardTitle className="text-xs font-semibold text-destructive">
+                Expired Documents
+              </CardTitle>
+              <AlertCircle className="h-4 w-4 text-destructive" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-destructive">
+                {isSummaryLoading ? (
+                  <Loader2 className="h-5 w-5 animate-spin" />
+                ) : (
+                  summary?.compliance.expired ?? 0
+                )}
+              </div>
+              <p className="text-[11px] text-destructive/80 mt-1 font-medium">Immediate action needed</p>
+            </CardContent>
+          </Card>
+
+          {/* 7 Days */}
+          <Card className="border-amber-500/30 bg-amber-500/5">
+            <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
+              <CardTitle className="text-xs font-semibold text-amber-600">
+                Expiring in 7 Days
+              </CardTitle>
+              <Clock className="h-4 w-4 text-amber-600" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-amber-600">
+                {isSummaryLoading ? (
+                  <Loader2 className="h-5 w-5 animate-spin" />
+                ) : (
+                  summary?.compliance.expiring7Days ?? 0
+                )}
+              </div>
+              <p className="text-[11px] text-amber-600/80 mt-1 font-medium">Critical renewal window</p>
+            </CardContent>
+          </Card>
+
+          {/* 30 Days */}
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
+              <CardTitle className="text-xs font-medium text-muted-foreground">
+                Expiring in 30 Days
+              </CardTitle>
+              <Clock className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-foreground">
+                {isSummaryLoading ? (
+                  <Loader2 className="h-5 w-5 animate-spin" />
+                ) : (
+                  summary?.compliance.expiring30Days ?? 0
+                )}
+              </div>
+              <p className="text-[11px] text-muted-foreground mt-1">Pending submission</p>
+            </CardContent>
+          </Card>
+
+          {/* 90 Days */}
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
+              <CardTitle className="text-xs font-medium text-muted-foreground">
+                Expiring in 90 Days
+              </CardTitle>
+              <Clock className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-foreground">
+                {isSummaryLoading ? (
+                  <Loader2 className="h-5 w-5 animate-spin" />
+                ) : (
+                  summary?.compliance.expiring90Days ?? 0
+                )}
+              </div>
+              <p className="text-[11px] text-muted-foreground mt-1">Early pipeline tracking</p>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+
+      {/* 3. Breakdown By Document Type */}
+      <div>
+        <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3">
+          Compliance by Document Type
+        </h3>
+        <div className="grid gap-3 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
+          {/* Passport */}
+          <div className="flex items-center justify-between p-3 rounded-lg border bg-card text-xs">
+            <div className="flex items-center gap-2">
+              <PassportIcon className="h-4 w-4 text-blue-500 shrink-0" />
+              <span className="font-medium text-foreground">Passport</span>
             </div>
-            <div className="rounded-lg border p-4">
-              <h4 className="font-semibold text-sm mb-1">UI & Client Base</h4>
-              <p className="text-xs text-muted-foreground">
-                Tailwind CSS, shadcn-ready primitives, TanStack Query provider, typed ApiClient, and responsive Layout.
-              </p>
-            </div>
-            <div className="rounded-lg border p-4">
-              <h4 className="font-semibold text-sm mb-1">Upcoming Modules</h4>
-              <p className="text-xs text-muted-foreground">
-                Employee Master, Passport/Visa/Work Permit tracking, R2 document upload, Expiry Tracking & Audit Log.
-              </p>
+            <div className="flex items-center gap-1.5">
+              {summary?.byType.passport.expired ? (
+                <Badge variant="destructive" className="text-[10px] py-0 px-1.5">
+                  {summary.byType.passport.expired} expired
+                </Badge>
+              ) : null}
+              <Badge variant="outline" className="text-[10px] py-0 px-1.5">
+                {summary?.byType.passport.expiringSoon ?? 0} soon
+              </Badge>
             </div>
           </div>
-        </CardContent>
-      </Card>
+
+          {/* Visa */}
+          <div className="flex items-center justify-between p-3 rounded-lg border bg-card text-xs">
+            <div className="flex items-center gap-2">
+              <FileText className="h-4 w-4 text-purple-500 shrink-0" />
+              <span className="font-medium text-foreground">Visa</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              {summary?.byType.visa.expired ? (
+                <Badge variant="destructive" className="text-[10px] py-0 px-1.5">
+                  {summary.byType.visa.expired} expired
+                </Badge>
+              ) : null}
+              <Badge variant="outline" className="text-[10px] py-0 px-1.5">
+                {summary?.byType.visa.expiringSoon ?? 0} soon
+              </Badge>
+            </div>
+          </div>
+
+          {/* Work Permit */}
+          <div className="flex items-center justify-between p-3 rounded-lg border bg-card text-xs">
+            <div className="flex items-center gap-2">
+              <CreditCard className="h-4 w-4 text-emerald-500 shrink-0" />
+              <span className="font-medium text-foreground">Work Permit</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              {summary?.byType.workPermit.expired ? (
+                <Badge variant="destructive" className="text-[10px] py-0 px-1.5">
+                  {summary.byType.workPermit.expired} expired
+                </Badge>
+              ) : null}
+              <Badge variant="outline" className="text-[10px] py-0 px-1.5">
+                {summary?.byType.workPermit.expiringSoon ?? 0} soon
+              </Badge>
+            </div>
+          </div>
+
+          {/* Uploaded Documents */}
+          <div className="flex items-center justify-between p-3 rounded-lg border bg-card text-xs">
+            <div className="flex items-center gap-2">
+              <Files className="h-4 w-4 text-amber-500 shrink-0" />
+              <span className="font-medium text-foreground">Uploaded Vault</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              {summary?.byType.uploadedDocuments.expired ? (
+                <Badge variant="destructive" className="text-[10px] py-0 px-1.5">
+                  {summary.byType.uploadedDocuments.expired} expired
+                </Badge>
+              ) : null}
+              <Badge variant="outline" className="text-[10px] py-0 px-1.5">
+                {summary?.byType.uploadedDocuments.expiringSoon ?? 0} soon
+              </Badge>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* 4. Prominent HR Action Center */}
+      <ActionCenterView onViewEmployee={onViewEmployee} />
     </div>
   );
 };

@@ -4,6 +4,7 @@ import { healthRoutes } from "./health";
 import { authRoutes } from "./auth";
 import { mastersRoutes } from "./masters";
 import { employeesRoutes } from "./employees";
+import { expiryRoutes } from "./expiry";
 
 export const apiRouter = new Hono<AppContext>();
 
@@ -11,3 +12,4 @@ apiRouter.route("/health", healthRoutes);
 apiRouter.route("/auth", authRoutes);
 apiRouter.route("/masters", mastersRoutes);
 apiRouter.route("/employees", employeesRoutes);
+apiRouter.route("/expiry", expiryRoutes);

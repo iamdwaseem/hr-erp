@@ -21,6 +21,7 @@ import {
 } from "../../shared/schemas/document";
 import {
   calculateDocumentStatus,
+  calculateDaysRemaining,
   type EmployeePassport,
   type EmployeeVisa,
   type EmployeeWorkPermit,
@@ -144,6 +145,7 @@ employeeDocumentsRoutes.get("/:id/passport", async (c) => {
   const passport: EmployeePassport = {
     ...doc,
     status: computedStatus,
+    daysRemaining: calculateDaysRemaining(doc.expiryDate),
   };
 
   return jsonSuccess(c, passport);
@@ -241,6 +243,7 @@ employeeDocumentsRoutes.post("/:id/passport", async (c) => {
     {
       ...saved[0],
       status: calculatedStatus,
+      daysRemaining: calculateDaysRemaining(saved[0].expiryDate),
     },
     undefined,
     201
@@ -341,6 +344,7 @@ employeeDocumentsRoutes.put("/:id/passport", async (c) => {
   return jsonSuccess(c, {
     ...saved[0],
     status: calculatedStatus,
+    daysRemaining: calculateDaysRemaining(saved[0].expiryDate),
   });
 });
 
@@ -370,6 +374,7 @@ employeeDocumentsRoutes.get("/:id/visa", async (c) => {
   const visa: EmployeeVisa = {
     ...doc,
     status: computedStatus,
+    daysRemaining: calculateDaysRemaining(doc.expiryDate),
   };
 
   return jsonSuccess(c, visa);
@@ -471,6 +476,7 @@ employeeDocumentsRoutes.post("/:id/visa", async (c) => {
     {
       ...saved[0],
       status: calculatedStatus,
+      daysRemaining: calculateDaysRemaining(saved[0].expiryDate),
     },
     undefined,
     201
@@ -575,6 +581,7 @@ employeeDocumentsRoutes.put("/:id/visa", async (c) => {
   return jsonSuccess(c, {
     ...saved[0],
     status: calculatedStatus,
+    daysRemaining: calculateDaysRemaining(saved[0].expiryDate),
   });
 });
 
@@ -604,6 +611,7 @@ employeeDocumentsRoutes.get("/:id/work-permit", async (c) => {
   const workPermit: EmployeeWorkPermit = {
     ...doc,
     status: computedStatus,
+    daysRemaining: calculateDaysRemaining(doc.expiryDate),
   };
 
   return jsonSuccess(c, workPermit);
@@ -699,6 +707,7 @@ employeeDocumentsRoutes.post("/:id/work-permit", async (c) => {
     {
       ...saved[0],
       status: calculatedStatus,
+      daysRemaining: calculateDaysRemaining(saved[0].expiryDate),
     },
     undefined,
     201
@@ -797,5 +806,6 @@ employeeDocumentsRoutes.put("/:id/work-permit", async (c) => {
   return jsonSuccess(c, {
     ...saved[0],
     status: calculatedStatus,
+    daysRemaining: calculateDaysRemaining(saved[0].expiryDate),
   });
 });
