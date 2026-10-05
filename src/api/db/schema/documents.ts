@@ -1,4 +1,4 @@
-import { sqliteTable, text, index } from "drizzle-orm/sqlite-core";
+import { sqliteTable, text, integer, index } from "drizzle-orm/sqlite-core";
 import { employees } from "./employees";
 
 export const employeePassports = sqliteTable(
@@ -71,6 +71,34 @@ export const employeeWorkPermits = sqliteTable(
   })
 );
 
+export const employeeDocuments = sqliteTable(
+  "employee_documents",
+  {
+    id: text("id").primaryKey(),
+    employeeId: text("employee_id")
+      .notNull()
+      .references(() => employees.id, { onDelete: "cascade" }),
+    documentType: text("document_type").notNull(),
+    documentNumber: text("document_number"),
+    issueDate: text("issue_date"),
+    expiryDate: text("expiry_date"),
+    r2Key: text("r2_key").notNull(),
+    originalFileName: text("original_file_name").notNull(),
+    mimeType: text("mime_type").notNull(),
+    fileSize: integer("file_size").notNull(),
+    verificationStatus: text("verification_status").notNull().default("PENDING"),
+    uploadedBy: text("uploaded_by").notNull(),
+    createdAt: text("created_at").notNull().$defaultFn(() => new Date().toISOString()),
+    updatedAt: text("updated_at").notNull().$defaultFn(() => new Date().toISOString()),
+  },
+  (table) => ({
+    empIdIdx: index("doc_emp_id_idx").on(table.employeeId),
+    docTypeIdx: index("doc_type_idx").on(table.documentType),
+    expiryIdx: index("doc_expiry_idx").on(table.expiryDate),
+    verificationIdx: index("doc_verification_idx").on(table.verificationStatus),
+  })
+);
+
 export type EmployeePassportEntity = typeof employeePassports.$inferSelect;
 export type NewEmployeePassportEntity = typeof employeePassports.$inferInsert;
 
@@ -79,3 +107,6 @@ export type NewEmployeeVisaEntity = typeof employeeVisas.$inferInsert;
 
 export type EmployeeWorkPermitEntity = typeof employeeWorkPermits.$inferSelect;
 export type NewEmployeeWorkPermitEntity = typeof employeeWorkPermits.$inferInsert;
+
+export type EmployeeDocumentEntity = typeof employeeDocuments.$inferSelect;
+export type NewEmployeeDocumentEntity = typeof employeeDocuments.$inferInsert;

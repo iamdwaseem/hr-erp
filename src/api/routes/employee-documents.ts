@@ -34,7 +34,7 @@ employeeDocumentsRoutes.use("*", requireAuth());
 /**
  * Helper to resolve employee target and enforce RBAC self-access rules.
  */
-async function resolveEmployeeAccess(
+export async function resolveEmployeeAccess(
   c: Context<AppContext>,
   paramId: string
 ): Promise<{ employee: EmployeeEntity | null; errorResponse?: ReturnType<typeof jsonError> }> {
@@ -105,7 +105,7 @@ async function resolveEmployeeAccess(
   return { employee };
 }
 
-function checkDocumentWritePermission(c: Context<AppContext>) {
+export function checkDocumentWritePermission(c: Context<AppContext>) {
   const user = c.get("user")!;
   if (user.role === ROLES.MANAGER || user.role === ROLES.EMPLOYEE) {
     return jsonError(

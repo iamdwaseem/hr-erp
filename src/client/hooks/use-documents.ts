@@ -1,9 +1,11 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { apiClient } from "../lib/api-client";
+import { apiClient, authStorage } from "../lib/api-client";
 import type {
   EmployeePassport,
   EmployeeVisa,
   EmployeeWorkPermit,
+  EmployeeDocument,
+  DocumentVerificationStatus,
 } from "../../shared/types/document";
 import type {
   PassportInput,
@@ -117,4 +119,113 @@ export function useUpdateWorkPermit(employeeId: string) {
       queryClient.invalidateQueries({ queryKey: ["employee", employeeId] });
     },
   });
+}
+
+// ==========================================
+// DOCUMENT VAULT HOOKS
+// ==========================================
+
+export function useEmployeeDocuments(
+  employeeId: string,
+  filters?: { documentType?: string; verificationStatus?: string }
+) {
+  return useQuery<EmployeeDocument[]>({
+    queryKey: ["employee", employeeId, "documents", filters],
+    queryFn: () =>
+      apiClient.get<EmployeeDocument[]>(`/employees/${employeeId}/documents`, {
+        params: filters,
+      }),
+    enabled: Boolean(employeeId),
+  });
+}
+
+export function useUploadDocument(employeeId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (formData: FormData) =>
+      apiClient.upload<EmployeeDocument>(`/employees/${employeeId}/documents`, formData),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["employee", employeeId, "documents"] });
+      queryClient.invalidateQueries({ queryKey: ["employee", employeeId] });
+    },
+  });
+}
+
+export function useDeleteDocument(employeeId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (documentId: string) =>
+      apiClient.delete<{ id: string; deleted: boolean }>(
+        `/employees/${employeeId}/documents/${documentId}`
+      ),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["employee", employeeId, "documents"] });
+      queryClient.invalidateQueries({ queryKey: ["employee", employeeId] });
+    },
+  });
+}
+
+export function useVerifyDocument(employeeId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      documentId,
+      status,
+    }: {
+      documentId: string;
+      status: DocumentVerificationStatus;
+    }) =>
+      apiClient.put<EmployeeDocument>(
+        `/employees/${employeeId}/documents/${documentId}/verification`,
+        { status }
+      ),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["employee", employeeId, "documents"] });
+      queryClient.invalidateQueries({ queryKey: ["employee", employeeId] });
+    },
+  });
+}
+
+/**
+ * Direct authenticated file download trigger.
+ */
+export async function downloadDocumentFile(
+  employeeId: string,
+  documentId: string,
+  originalFileName: string
+): Promise<void> {
+  const token = authStorage.getToken();
+  const headers = new Headers();
+  if (token) {
+    headers.set("Authorization", `Bearer ${token}`);
+  }
+
+  const response = await fetch(
+    `/api/employees/${employeeId}/documents/${documentId}/download`,
+    {
+      method: "GET",
+      headers,
+    }
+  );
+
+  if (!response.ok) {
+    let errMessage = "Download failed";
+    try {
+      const errJson = await response.json();
+      errMessage = errJson.error?.message || errMessage;
+    } catch {
+      // Ignore
+    }
+    throw new Error(errMessage);
+  }
+
+  const blob = await response.blob();
+  const blobUrl = window.URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = blobUrl;
+  a.download = originalFileName;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  window.URL.revokeObjectURL(blobUrl);
 }

@@ -17,6 +17,7 @@ import type { Employee, EmployeeListItem } from "../../shared/types/employee";
 import { jsonSuccess, jsonError } from "../utils/response";
 
 import { employeeDocumentsRoutes } from "./employee-documents";
+import { employeeDocumentVaultRoutes } from "./employee-document-vault";
 
 export const employeesRoutes = new Hono<AppContext>();
 
@@ -25,6 +26,9 @@ employeesRoutes.use("*", requireAuth());
 
 // Mount Passport, Visa, and Work Permit subroutes
 employeesRoutes.route("/", employeeDocumentsRoutes);
+
+// Mount Document Vault & R2 subroutes
+employeesRoutes.route("/", employeeDocumentVaultRoutes);
 
 /**
  * GET /api/employees

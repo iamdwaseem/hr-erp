@@ -107,3 +107,69 @@ export interface EmployeeWorkPermit {
   createdAt: string;
   updatedAt: string;
 }
+
+// ==========================================
+// DOCUMENT VAULT TYPES
+// ==========================================
+
+export const DOCUMENT_TYPES = {
+  PASSPORT: "PASSPORT",
+  VISA: "VISA",
+  WORK_PERMIT: "WORK_PERMIT",
+  NATIONAL_ID: "NATIONAL_ID",
+  OTHER: "OTHER",
+} as const;
+
+export type DocumentType = (typeof DOCUMENT_TYPES)[keyof typeof DOCUMENT_TYPES];
+
+export const DOCUMENT_TYPE_LABELS: Record<DocumentType, string> = {
+  [DOCUMENT_TYPES.PASSPORT]: "Passport",
+  [DOCUMENT_TYPES.VISA]: "Visa",
+  [DOCUMENT_TYPES.WORK_PERMIT]: "Work Permit",
+  [DOCUMENT_TYPES.NATIONAL_ID]: "National ID",
+  [DOCUMENT_TYPES.OTHER]: "Other Document",
+};
+
+export const DOCUMENT_VERIFICATION_STATUSES = {
+  PENDING: "PENDING",
+  VERIFIED: "VERIFIED",
+  REJECTED: "REJECTED",
+} as const;
+
+export type DocumentVerificationStatus =
+  (typeof DOCUMENT_VERIFICATION_STATUSES)[keyof typeof DOCUMENT_VERIFICATION_STATUSES];
+
+export const DOCUMENT_VERIFICATION_CONFIG: Record<
+  DocumentVerificationStatus,
+  StatusBadgeConfig
+> = {
+  [DOCUMENT_VERIFICATION_STATUSES.PENDING]: {
+    label: "Pending",
+    variant: "warning",
+  },
+  [DOCUMENT_VERIFICATION_STATUSES.VERIFIED]: {
+    label: "Verified",
+    variant: "success",
+  },
+  [DOCUMENT_VERIFICATION_STATUSES.REJECTED]: {
+    label: "Rejected",
+    variant: "destructive",
+  },
+};
+
+export interface EmployeeDocument {
+  id: string;
+  employeeId: string;
+  documentType: DocumentType;
+  documentNumber: string | null;
+  issueDate: string | null;
+  expiryDate: string | null;
+  originalFileName: string;
+  mimeType: string;
+  fileSize: number;
+  verificationStatus: DocumentVerificationStatus;
+  status?: DocumentStatus | null;
+  uploadedBy: string;
+  createdAt: string;
+  updatedAt: string;
+}

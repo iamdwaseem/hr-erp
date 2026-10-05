@@ -160,3 +160,61 @@ export const updateWorkPermitSchema = workPermitBaseSchema.partial().refine(
 );
 
 export type UpdateWorkPermitInput = z.infer<typeof updateWorkPermitSchema>;
+
+// ==========================================
+// DOCUMENT VAULT SCHEMAS
+// ==========================================
+
+export const documentTypeSchema = z.enum([
+  "PASSPORT",
+  "VISA",
+  "WORK_PERMIT",
+  "NATIONAL_ID",
+  "OTHER",
+]);
+
+export const verificationStatusSchema = z.enum([
+  "PENDING",
+  "VERIFIED",
+  "REJECTED",
+]);
+
+export const uploadDocumentMetadataSchema = z
+  .object({
+    documentType: documentTypeSchema,
+    documentNumber: z.string().trim().max(50).optional().nullable(),
+    issueDate: z
+      .string()
+      .optional()
+      .nullable()
+      .refine(
+        (val) => !val || isValidDateString(val),
+        "Issue Date must be a valid date in YYYY-MM-DD format"
+      ),
+    expiryDate: z
+      .string()
+      .optional()
+      .nullable()
+      .refine(
+        (val) => !val || isValidDateString(val),
+        "Expiry Date must be a valid date in YYYY-MM-DD format"
+      ),
+  })
+  .refine(
+    (data) => {
+      if (!data.issueDate || !data.expiryDate) return true;
+      return new Date(data.expiryDate).getTime() >= new Date(data.issueDate).getTime();
+    },
+    {
+      message: "Expiry date must not be before issue date",
+      path: ["expiryDate"],
+    }
+  );
+
+export type UploadDocumentMetadataInput = z.infer<typeof uploadDocumentMetadataSchema>;
+
+export const updateVerificationStatusSchema = z.object({
+  status: verificationStatusSchema,
+});
+
+export type UpdateVerificationStatusInput = z.infer<typeof updateVerificationStatusSchema>;

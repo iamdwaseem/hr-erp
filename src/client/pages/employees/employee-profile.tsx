@@ -36,6 +36,7 @@ import { EmployeeFormDialog } from "./employee-form-dialog";
 import { PassportDialog } from "./passport-dialog";
 import { VisaDialog } from "./visa-dialog";
 import { WorkPermitDialog } from "./work-permit-dialog";
+import { DocumentVaultTab } from "./document-vault-tab";
 
 interface EmployeeProfileProps {
   employeeId: string;
@@ -715,17 +716,12 @@ export const EmployeeProfile: React.FC<EmployeeProfileProps> = ({
         </div>
       )}
 
-      {/* Tab Contents: Documents (Placeholder for Next Phase) */}
+      {/* Tab Contents: Documents (Document Vault) */}
       {activeTab === "documents" && (
-        <Card className="border-dashed text-center py-12">
-          <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-primary/10 text-primary">
-            <FileCheck2 className="h-6 w-6" />
-          </div>
-          <CardTitle className="mt-4 text-lg">Documents & R2 Storage</CardTitle>
-          <p className="mt-2 text-sm text-muted-foreground max-w-sm mx-auto">
-            Cloudflare R2 document upload, storage, verification, and expiry tracking will be available in the upcoming phase.
-          </p>
-        </Card>
+        <DocumentVaultTab
+          employeeId={effectiveId}
+          canManage={canEdit}
+        />
       )}
 
       {/* Edit Employee Modal */}
