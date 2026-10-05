@@ -26,9 +26,9 @@ export const registerUserSchema = z.object({
     .min(2, "Full name must be at least 2 characters"),
   role: z.enum([
     ROLES.ADMIN,
-    ROLES.HR_MANAGER,
-    ROLES.HR_OFFICER,
-    ROLES.VIEWER,
+    ROLES.HR,
+    ROLES.MANAGER,
+    ROLES.EMPLOYEE,
   ]),
 });
 

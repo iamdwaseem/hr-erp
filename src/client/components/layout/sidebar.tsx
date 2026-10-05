@@ -1,14 +1,16 @@
 import React from "react";
-import { LayoutDashboard, Users, AlertCircle, History, Shield, X } from "lucide-react";
+import { LayoutDashboard, Users, AlertCircle, History, Shield, X, User as UserIcon } from "lucide-react";
 import { useAuth } from "../../hooks/use-auth";
 import { cn } from "../../lib/utils";
-import { PERMISSIONS } from "../../../shared/constants/roles";
+import { ROLES, type UserRole, PERMISSIONS } from "../../../shared/constants/roles";
 
 export interface NavItem {
   title: string;
   href: string;
   icon: React.ComponentType<{ className?: string }>;
   permission?: (typeof PERMISSIONS)[keyof typeof PERMISSIONS];
+  roles?: readonly UserRole[];
+  excludeRoles?: readonly UserRole[];
   badge?: string;
 }
 
@@ -19,22 +21,31 @@ const navItems: NavItem[] = [
     icon: LayoutDashboard,
   },
   {
+    title: "My Profile",
+    href: "/profile",
+    icon: UserIcon,
+    roles: [ROLES.EMPLOYEE],
+  },
+  {
     title: "Employee Master",
     href: "/employees",
     icon: Users,
     permission: PERMISSIONS.EMPLOYEE_READ,
+    excludeRoles: [ROLES.EMPLOYEE],
   },
   {
     title: "HR Action Center",
     href: "/action-center",
     icon: AlertCircle,
     badge: "Alerts",
+    excludeRoles: [ROLES.EMPLOYEE],
   },
   {
     title: "Basic Audit Log",
     href: "/audit",
     icon: History,
     permission: PERMISSIONS.AUDIT_READ,
+    excludeRoles: [ROLES.EMPLOYEE],
   },
 ];
 
@@ -54,8 +65,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const { can, user } = useAuth();
 
   const filteredItems = navItems.filter((item) => {
-    if (!item.permission) return true;
-    return can(item.permission);
+    if (!user) return false;
+    if (item.roles && !item.roles.includes(user.role)) return false;
+    if (item.excludeRoles && item.excludeRoles.includes(user.role)) return false;
+    if (item.permission && !can(item.permission)) return false;
+    return true;
   });
 
   return (

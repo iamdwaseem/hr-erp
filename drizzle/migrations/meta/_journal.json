@@ -8,6 +8,20 @@
       "when": 1791205266710,
       "tag": "0000_demonic_ink",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "6",
+      "when": 1791206192507,
+      "tag": "0001_freezing_scarecrow",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1791206292507,
+      "tag": "0002_seed_initial_data",
+      "breakpoints": true
     }
   ]
 }

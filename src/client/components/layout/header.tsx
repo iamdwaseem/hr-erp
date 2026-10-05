@@ -52,7 +52,7 @@ export const Header: React.FC<HeaderProps> = ({ onToggleSidebar, title }) => {
             </div>
 
             <Badge
-              variant={user.role === "admin" ? "default" : "secondary"}
+              variant={user.role === "ADMIN" ? "default" : "secondary"}
               className="capitalize hidden md:inline-flex"
             >
               {user.role.replace("_", " ")}

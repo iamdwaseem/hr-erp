@@ -1,18 +1,27 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { queryClient } from "./lib/query-client";
 import { AuthProvider, useAuth } from "./context/auth-context";
 import { LoginPage } from "./pages/login";
 import { DashboardPage } from "./pages/dashboard";
+import { EmployeesPage } from "./pages/employees";
+import { EmployeeProfile } from "./pages/employees/employee-profile";
 import { ModulePlaceholder } from "./pages/module-placeholder";
 import { NotFoundPage } from "./pages/not-found";
 import { AppLayout } from "./components/layout/app-layout";
 import { ProtectedRoute } from "./components/layout/protected-route";
-import { PERMISSIONS } from "../shared/constants/roles";
+import { PERMISSIONS, ROLES } from "../shared/constants/roles";
 
 const AppContent: React.FC = () => {
-  const { isAuthenticated, isLoading } = useAuth();
+  const { user, isAuthenticated, isLoading } = useAuth();
   const [currentPath, setCurrentPath] = useState<string>("/dashboard");
+
+  // If logged in as an EMPLOYEE, default path to /profile instead of /dashboard or /employees
+  useEffect(() => {
+    if (user?.role === ROLES.EMPLOYEE && currentPath === "/employees") {
+      setCurrentPath("/profile");
+    }
+  }, [user, currentPath]);
 
   if (isLoading) {
     return (
@@ -33,15 +42,17 @@ const AppContent: React.FC = () => {
           title: "HR Dashboard",
           component: <DashboardPage />,
         };
+      case "/profile":
+        return {
+          title: "My Profile",
+          component: <EmployeeProfile employeeId="me" />,
+        };
       case "/employees":
         return {
           title: "Employee Master",
           component: (
             <ProtectedRoute requiredPermission={PERMISSIONS.EMPLOYEE_READ}>
-              <ModulePlaceholder
-                title="Employee Master"
-                description="Core Employee Master module with Add/Edit, Profile, Passport, Visa, Work Permit, and R2 Document storage will be implemented in Phase 1."
-              />
+              <EmployeesPage />
             </ProtectedRoute>
           ),
         };
@@ -51,7 +62,7 @@ const AppContent: React.FC = () => {
           component: (
             <ModulePlaceholder
               title="HR Action Center"
-              description="Document Expiry Tracking, alert badges, and pending HR action queues will be implemented in Phase 1."
+              description="Document Expiry Tracking, alert badges, and pending HR action queues will be implemented in subsequent phases."
             />
           ),
         };
@@ -62,7 +73,7 @@ const AppContent: React.FC = () => {
             <ProtectedRoute requiredPermission={PERMISSIONS.AUDIT_READ}>
               <ModulePlaceholder
                 title="Basic Audit Log"
-                description="Chronological log of administrative actions, logins, and document mutations will be implemented in Phase 1."
+                description="Chronological log of administrative actions, logins, and document mutations will be implemented in subsequent phases."
               />
             </ProtectedRoute>
           ),
@@ -70,7 +81,7 @@ const AppContent: React.FC = () => {
       default:
         return {
           title: "Not Found",
-          component: <NotFoundPage onGoHome={() => setCurrentPath("/dashboard")} />,
+          component: <NotFoundPage onGoHome={() => setCurrentPath(user?.role === ROLES.EMPLOYEE ? "/profile" : "/dashboard")} />,
         };
     }
   };

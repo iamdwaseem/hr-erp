@@ -41,9 +41,9 @@ export const LoginPage: React.FC = () => {
     }
   };
 
-  const fillDemoAdmin = () => {
-    setValue("email", "admin@hr-erp.local");
-    setValue("password", "AdminPassword123!");
+  const fillRole = (email: string, pass: string) => {
+    setValue("email", email);
+    setValue("password", pass);
     setErrorMessage(null);
   };
 
@@ -102,16 +102,39 @@ export const LoginPage: React.FC = () => {
                 )}
               </div>
 
-              {/* Development Quick-Fill Helper */}
-              <div className="rounded-lg bg-primary/5 p-3 text-xs border border-primary/10 text-muted-foreground flex items-center justify-between">
-                <span>Demo Admin account:</span>
-                <button
-                  type="button"
-                  onClick={fillDemoAdmin}
-                  className="font-semibold text-primary hover:underline"
-                >
-                  Fill Credentials
-                </button>
+              {/* Demo Account Quick-Fill */}
+              <div className="rounded-lg bg-muted/50 p-3 text-xs border space-y-2">
+                <div className="text-muted-foreground font-medium">Quick-login demo roles:</div>
+                <div className="grid grid-cols-2 gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => fillRole("admin@hr-erp.local", "AdminPassword123!")}
+                    className="rounded border bg-background px-2 py-1 text-left font-medium hover:bg-accent"
+                  >
+                    👑 ADMIN
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => fillRole("hr@hr-erp.local", "HrPassword123!")}
+                    className="rounded border bg-background px-2 py-1 text-left font-medium hover:bg-accent"
+                  >
+                    💼 HR
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => fillRole("manager@hr-erp.local", "ManagerPassword123!")}
+                    className="rounded border bg-background px-2 py-1 text-left font-medium hover:bg-accent"
+                  >
+                    👔 MANAGER
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => fillRole("employee@hr-erp.local", "EmployeePassword123!")}
+                    className="rounded border bg-background px-2 py-1 text-left font-medium hover:bg-accent"
+                  >
+                    👤 EMPLOYEE
+                  </button>
+                </div>
               </div>
             </CardContent>
 
