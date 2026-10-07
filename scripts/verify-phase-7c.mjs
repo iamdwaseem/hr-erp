@@ -95,9 +95,13 @@ async function runTests() {
   }
 
   // Test 4: Seed script is idempotent for existing configured admin
+  const activeAdmin = executeD1("SELECT email, full_name FROM users WHERE role = 'ADMIN' AND is_active = 1 LIMIT 1;")[0];
+  const adminEmail = activeAdmin?.email || "admin@hr-erp.local";
+  const adminName = activeAdmin?.full_name || "System Administrator";
+
   const countBefore = executeD1("SELECT count(*) as count FROM users;")[0].count;
   const seedOutput1 = execSync(
-    'ADMIN_NAME="System Administrator" ADMIN_EMAIL="admin@hr-erp.local" ADMIN_PASSWORD="AdminPassword123!" node scripts/seed-admin.mjs',
+    `ADMIN_NAME="${adminName}" ADMIN_EMAIL="${adminEmail}" ADMIN_PASSWORD="AdminPassword123!" node scripts/seed-admin.mjs`,
     { encoding: "utf8" }
   );
   const countAfter1 = executeD1("SELECT count(*) as count FROM users;")[0].count;
@@ -110,7 +114,7 @@ async function runTests() {
 
   // Test 5: Running seed a second time produces identical safe output
   const seedOutput2 = execSync(
-    'ADMIN_NAME="System Administrator" ADMIN_EMAIL="admin@hr-erp.local" ADMIN_PASSWORD="AdminPassword123!" node scripts/seed-admin.mjs',
+    `ADMIN_NAME="${adminName}" ADMIN_EMAIL="${adminEmail}" ADMIN_PASSWORD="AdminPassword123!" node scripts/seed-admin.mjs`,
     { encoding: "utf8" }
   );
   const countAfter2 = executeD1("SELECT count(*) as count FROM users;")[0].count;

@@ -23,7 +23,7 @@ import {
 } from "../../hooks/use-users";
 import { Button } from "../../components/ui/button";
 import { Input } from "../../components/ui/input";
-import { ROLES } from "../../../shared/constants/roles";
+import { ROLES, USER_QUOTAS } from "../../../shared/constants/roles";
 import type { SafeUser } from "../../../shared/types/auth";
 
 export const UsersPage: React.FC = () => {
@@ -47,7 +47,7 @@ export const UsersPage: React.FC = () => {
   const [formSuccess, setFormSuccess] = useState<string | null>(null);
 
   const activeHrCount = users.filter((u) => u.role === ROLES.HR && u.isActive).length;
-  const isHrCapReached = activeHrCount >= 2;
+  const isHrCapReached = activeHrCount >= USER_QUOTAS.MAX_ACTIVE_HR;
 
   const handleOpenCreate = () => {
     setFormError(null);
@@ -156,7 +156,7 @@ export const UsersPage: React.FC = () => {
         setFormSuccess(`User ${user.fullName} has been disabled.`);
       } else {
         if (user.role === ROLES.HR && isHrCapReached) {
-          alert("Maximum 2 active HR accounts allowed. Please disable an existing active HR user before activating another.");
+          alert(`Maximum ${USER_QUOTAS.MAX_ACTIVE_HR} active HR accounts allowed. Please disable an existing active HR user before activating another.`);
           return;
         }
         await enableUser.mutateAsync(user.id);
@@ -175,7 +175,7 @@ export const UsersPage: React.FC = () => {
         <div>
           <h1 className="text-2xl font-bold tracking-tight text-foreground">User Management</h1>
           <p className="text-sm text-muted-foreground mt-1">
-            System login authorization: Exactly 1 Administrator and maximum 2 active HR accounts.
+            System login authorization: Exactly 1 Administrator and maximum {USER_QUOTAS.MAX_ACTIVE_HR} active HR accounts.
           </p>
         </div>
         <Button
@@ -213,13 +213,13 @@ export const UsersPage: React.FC = () => {
             </div>
             <div>
               <p className="text-sm font-semibold text-foreground">Active HR Users Quota</p>
-              <p className="text-xs text-muted-foreground">Maximum 2 concurrent active HR logins</p>
+              <p className="text-xs text-muted-foreground">Maximum {USER_QUOTAS.MAX_ACTIVE_HR} concurrent active HR logins</p>
             </div>
           </div>
           <div className="text-right">
-            <span className="text-xl font-bold text-foreground">{activeHrCount} / 2</span>
+            <span className="text-xl font-bold text-foreground">{activeHrCount} / {USER_QUOTAS.MAX_ACTIVE_HR}</span>
             <p className={`text-xs font-medium ${isHrCapReached ? "text-amber-600" : "text-emerald-600"}`}>
-              {isHrCapReached ? "Capacity Reached" : `${2 - activeHrCount} Slots Available`}
+              {isHrCapReached ? "Capacity Reached" : `${USER_QUOTAS.MAX_ACTIVE_HR - activeHrCount} Slots Available`}
             </p>
           </div>
         </div>

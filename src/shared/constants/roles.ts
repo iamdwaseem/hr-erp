@@ -5,6 +5,11 @@ export const ROLES = {
 
 export type UserRole = (typeof ROLES)[keyof typeof ROLES];
 
+export const USER_QUOTAS = {
+  MAX_ADMIN: 1,
+  MAX_ACTIVE_HR: 5,
+} as const;
+
 export const PERMISSIONS = {
   EMPLOYEE_READ: "employee:read",
   EMPLOYEE_CREATE: "employee:create",

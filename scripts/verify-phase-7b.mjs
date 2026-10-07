@@ -123,22 +123,47 @@ async function runTests() {
   });
   assert(hrListUsers.status === 403, "12. RBAC: HR cannot access /users (403 Forbidden)");
 
-  // 13. System enforces max 2 active HR cap
-  const create3rdHr = await request("/users", {
+  // 13. System enforces max 5 active HR cap
+  const quotaTs = Date.now().toString().slice(-4);
+  const tempHrIds = [];
+  for (let i = 3; i <= 5; i++) {
+    const res = await request("/users", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${adminToken}` },
+      body: JSON.stringify({
+        fullName: `Temp HR User ${i}`,
+        email: `hr${i}_${quotaTs}@hr-erp.local`,
+        password: "TestPassword123!",
+        role: "HR",
+      }),
+    });
+    if (res.data?.data?.id) tempHrIds.push(res.data.data.id);
+  }
+
+  // Now active HR count is 5. Attempting to create a 6th must fail with HR_LIMIT_EXCEEDED
+  const create6thHr = await request("/users", {
     method: "POST",
     headers: { Authorization: `Bearer ${adminToken}` },
     body: JSON.stringify({
-      fullName: "Third HR User",
-      email: "hr3_test@hr-erp.local",
+      fullName: "Sixth HR User",
+      email: `hr6_${quotaTs}@hr-erp.local`,
       password: "TestPassword123!",
       role: "HR",
     }),
   });
   assert(
-    create3rdHr.status === 400 && create3rdHr.data?.error?.code === "HR_LIMIT_EXCEEDED",
-    "13. User Quota: Rejects 3rd active HR user when 2 are already active",
-    JSON.stringify(create3rdHr.data)
+    create6thHr.status === 400 && create6thHr.data?.error?.code === "HR_LIMIT_EXCEEDED",
+    "13. User Quota: Rejects 6th active HR user when 5 are already active",
+    JSON.stringify(create6thHr.data)
   );
+
+  // Disable the temporary HRs so active count returns to 2
+  for (const tid of tempHrIds) {
+    await request(`/users/${tid}/disable`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${adminToken}` },
+    });
+  }
 
   // 14. Cannot create a 2nd Admin
   const create2ndAdmin = await request("/users", {
@@ -212,16 +237,28 @@ async function runTests() {
   const replacementToken = replacementLogin.data?.data?.token;
   assert(replacementLogin.status === 200 && replacementToken, "19. Auth: Replacement HR logs in successfully");
 
-  // 20. Enabling HR2 now rejected because active HR count is back to 2
+  // 20. Enabling when 5 active HRs exist is rejected
+  for (const tid of tempHrIds) {
+    await request(`/users/${tid}/enable`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${adminToken}` },
+    });
+  }
   const tryReEnableHr2 = await request("/users/usr_hr_2_default/enable", {
     method: "POST",
     headers: { Authorization: `Bearer ${adminToken}` },
   });
   assert(
     tryReEnableHr2.status === 400 && tryReEnableHr2.data?.error?.code === "HR_LIMIT_EXCEEDED",
-    "20. User Quota: Re-enabling account rejected if 2 active HRs already exist",
+    "20. User Quota: Re-enabling account rejected if 5 active HRs already exist",
     JSON.stringify(tryReEnableHr2.data)
   );
+  for (const tid of tempHrIds) {
+    await request(`/users/${tid}/disable`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${adminToken}` },
+    });
+  }
 
   // 21. Update replacement HR display name and email
   const updateReplacement = await request(`/users/${replacementHr.id}`, {

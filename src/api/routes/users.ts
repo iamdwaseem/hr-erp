@@ -3,7 +3,7 @@ import { eq, and, count, ne } from "drizzle-orm";
 import type { AppContext } from "../types";
 import { requireAuth } from "../middleware/auth";
 import { requireRole } from "../middleware/rbac";
-import { ROLES, type UserRole } from "../../shared/constants/roles";
+import { ROLES, USER_QUOTAS, type UserRole } from "../../shared/constants/roles";
 import { getDb } from "../db/client";
 import { users } from "../db/schema/users";
 import { auditLogs } from "../db/schema/audit";
@@ -57,7 +57,7 @@ usersRoutes.get("/", async (c) => {
  * Create a new user account.
  * Strict rules:
  * - Only HR accounts can be created (cannot create a second ADMIN).
- * - Maximum 2 active HR accounts allowed in the entire system.
+ * - Maximum 5 active HR accounts allowed in the entire system.
  */
 usersRoutes.post("/", async (c) => {
   const body = await c.req.json().catch(() => null);
@@ -105,18 +105,18 @@ usersRoutes.post("/", async (c) => {
       );
     }
 
-    // Rule: Maximum 2 active HR accounts
+    // Rule: Maximum 5 active HR accounts
     const activeHrCountResult = await db
       .select({ count: count() })
       .from(users)
       .where(and(eq(users.role, ROLES.HR), eq(users.isActive, true)));
 
     const activeHrCount = activeHrCountResult[0]?.count ?? 0;
-    if (activeHrCount >= 2) {
+    if (activeHrCount >= USER_QUOTAS.MAX_ACTIVE_HR) {
       return jsonError(
         c,
         "HR_LIMIT_EXCEEDED",
-        "Maximum 2 active HR user accounts allowed. Please deactivate an existing HR user before creating a new one.",
+        `Maximum ${USER_QUOTAS.MAX_ACTIVE_HR} active HR user accounts allowed. Please deactivate an existing HR user before creating a new one.`,
         400
       );
     }
@@ -415,7 +415,7 @@ usersRoutes.post("/:id/disable", async (c) => {
 /**
  * POST /api/users/:id/enable
  * Reactivate an inactive user account.
- * Strict rule: Cannot exceed maximum 2 active HR users.
+ * Strict rule: Cannot exceed maximum 5 active HR users.
  */
 usersRoutes.post("/:id/enable", async (c) => {
   const id = c.req.param("id");
@@ -449,11 +449,11 @@ usersRoutes.post("/:id/enable", async (c) => {
         .where(and(eq(users.role, ROLES.HR), eq(users.isActive, true)));
 
       const activeHrCount = activeHrCountResult[0]?.count ?? 0;
-      if (activeHrCount >= 2) {
+      if (activeHrCount >= USER_QUOTAS.MAX_ACTIVE_HR) {
         return jsonError(
           c,
           "HR_LIMIT_EXCEEDED",
-          "Maximum 2 active HR user accounts allowed. Please deactivate an active HR user before re-enabling this account.",
+          `Maximum ${USER_QUOTAS.MAX_ACTIVE_HR} active HR user accounts allowed. Please deactivate an active HR user before re-enabling this account.`,
           400
         );
       }
