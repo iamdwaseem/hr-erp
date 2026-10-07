@@ -48,19 +48,26 @@ async function runTests() {
   });
   const hrToken = loginHr.data?.data?.token;
 
+  const loginHr2 = await request("/auth/login", {
+    method: "POST",
+    body: JSON.stringify({ email: "hr2@hr-erp.local", password: "Hr2Password123!" }),
+  });
+  const hr2Token = loginHr2.data?.data?.token;
+
   const loginManager = await request("/auth/login", {
     method: "POST",
     body: JSON.stringify({ email: "manager@hr-erp.local", password: "ManagerPassword123!" }),
   });
-  const managerToken = loginManager.data?.data?.token;
 
   const loginEmployee = await request("/auth/login", {
     method: "POST",
     body: JSON.stringify({ email: "employee@hr-erp.local", password: "EmployeePassword123!" }),
   });
-  const employeeToken = loginEmployee.data?.data?.token;
 
-  assert(adminToken && hrToken && managerToken && employeeToken, "Auth: All 4 roles authenticated successfully");
+  assert(
+    adminToken && hrToken && hr2Token && loginManager.status === 403 && loginEmployee.status === 403,
+    "Auth: 1 ADMIN + 2 HR authenticated, Manager & Employee logins rejected (Phase 7B)"
+  );
 
   // Targets for testing:
   // emp_001 is John Doe (linked to employee@hr-erp.local)
@@ -103,42 +110,37 @@ async function runTests() {
     JSON.stringify(hrPassport)
   );
 
-  // Test 3: MANAGER can view passport
-  const mgrViewPassport = await request("/employees/emp_001/passport", {
-    headers: { Authorization: `Bearer ${managerToken}` },
+  // Test 3: HR2 (2nd HR user) can view passport
+  const hr2ViewPassport = await request("/employees/emp_001/passport", {
+    headers: { Authorization: `Bearer ${hr2Token}` },
   });
   assert(
-    mgrViewPassport.status === 200 && mgrViewPassport.data?.data?.passportNumber === "PASS-ADM-001",
-    "Test 3: MANAGER can view passport"
+    hr2ViewPassport.status === 200 && hr2ViewPassport.data?.data?.passportNumber === "PASS-ADM-001",
+    "Test 3: HR2 (second active HR) can view passport"
   );
 
-  // Test 4: MANAGER cannot edit passport
-  const mgrEditPassport = await request("/employees/emp_001/passport", {
+  // Test 4: Unauthorized cannot edit passport
+  const unauthEditPassport = await request("/employees/emp_001/passport", {
     method: "PUT",
-    headers: { Authorization: `Bearer ${managerToken}` },
+    headers: { Authorization: "Bearer invalid_token" },
     body: JSON.stringify({ placeOfIssue: "Unauthorized City" }),
   });
   assert(
-    mgrEditPassport.status === 403,
-    "Test 4: MANAGER cannot edit passport (receives 403)"
+    unauthEditPassport.status === 401 || unauthEditPassport.status === 403,
+    "Test 4: Unauthorized cannot edit passport (receives 401/403)"
   );
 
-  // Test 5: EMPLOYEE can view own passport (via /me/passport and /emp_001/passport)
-  const empOwnPassport = await request("/employees/me/passport", {
-    headers: { Authorization: `Bearer ${employeeToken}` },
-  });
+  // Test 5: HR2 can view employee passport
   assert(
-    empOwnPassport.status === 200 && empOwnPassport.data?.data?.passportNumber === "PASS-ADM-001",
-    "Test 5: EMPLOYEE can view own passport via /api/employees/me/passport"
+    hr2ViewPassport.status === 200,
+    "Test 5: HR2 can view employee documents"
   );
 
-  // Test 6: EMPLOYEE cannot view another employee's passport
-  const empOtherPassport = await request("/employees/emp_002/passport", {
-    headers: { Authorization: `Bearer ${employeeToken}` },
-  });
+  // Test 6: Unauthenticated cannot view employee's passport
+  const unauthPassport = await request("/employees/emp_002/passport");
   assert(
-    empOtherPassport.status === 403,
-    "Test 6: EMPLOYEE cannot view another employee's passport (receives 403)"
+    unauthPassport.status === 401,
+    "Test 6: Unauthenticated cannot view employee passport (receives 401)"
   );
 
   // Test 7: ADMIN can create visa
@@ -177,21 +179,21 @@ async function runTests() {
   // Test 9: MANAGER cannot edit visa
   const mgrEditVisa = await request("/employees/emp_001/visa", {
     method: "PUT",
-    headers: { Authorization: `Bearer ${managerToken}` },
+    headers: { Authorization: "Bearer invalid_manager_token" },
     body: JSON.stringify({ sponsorName: "Hacked Sponsor" }),
   });
   assert(
-    mgrEditVisa.status === 403,
-    "Test 9: MANAGER cannot edit visa (receives 403)"
+    mgrEditVisa.status === 401 || mgrEditVisa.status === 403,
+    "Test 9: Unauthorized cannot edit visa (receives 401/403)"
   );
 
-  // Test 10: EMPLOYEE can view own visa
-  const empOwnVisa = await request("/employees/me/visa", {
-    headers: { Authorization: `Bearer ${employeeToken}` },
+  // Test 10: HR2 can view visa
+  const hr2OwnVisa = await request("/employees/emp_001/visa", {
+    headers: { Authorization: `Bearer ${hr2Token}` },
   });
   assert(
-    empOwnVisa.status === 200 && empOwnVisa.data?.data?.visaNumber === "VISA-ADM-001",
-    "Test 10: EMPLOYEE can view own visa"
+    hr2OwnVisa.status === 200 && hr2OwnVisa.data?.data?.visaNumber === "VISA-ADM-001",
+    "Test 10: HR2 can view employee visa"
   );
 
   // Test 11: ADMIN can create work permit
@@ -224,24 +226,24 @@ async function runTests() {
     "Test 12: HR can edit work permit"
   );
 
-  // Test 13: MANAGER cannot edit work permit
+  // Test 13: Unauthorized cannot edit work permit
   const mgrEditWp = await request("/employees/emp_001/work-permit", {
     method: "PUT",
-    headers: { Authorization: `Bearer ${managerToken}` },
+    headers: { Authorization: "Bearer invalid_manager_token" },
     body: JSON.stringify({ profession: "Hacked Profession" }),
   });
   assert(
-    mgrEditWp.status === 403,
-    "Test 13: MANAGER cannot edit work permit (receives 403)"
+    mgrEditWp.status === 401 || mgrEditWp.status === 403,
+    "Test 13: Unauthorized cannot edit work permit (receives 401/403)"
   );
 
-  // Test 14: EMPLOYEE can view own work permit
-  const empOwnWp = await request("/employees/me/work-permit", {
-    headers: { Authorization: `Bearer ${employeeToken}` },
+  // Test 14: HR2 can view work permit
+  const hr2OwnWp = await request("/employees/emp_001/work-permit", {
+    headers: { Authorization: `Bearer ${hr2Token}` },
   });
   assert(
-    empOwnWp.status === 200 && empOwnWp.data?.data?.permitNumber === "WP-ADM-001",
-    "Test 14: EMPLOYEE can view own work permit"
+    hr2OwnWp.status === 200 && hr2OwnWp.data?.data?.permitNumber === "WP-ADM-001",
+    "Test 14: HR2 can view employee work permit"
   );
 
   // Test 15: Invalid dates return validation errors (e.g. expiry before issue)

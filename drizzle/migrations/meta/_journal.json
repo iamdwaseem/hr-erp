@@ -43,6 +43,20 @@
       "when": 1791209845802,
       "tag": "0005_spotty_wasp",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "6",
+      "when": 1791212000000,
+      "tag": "0006_employee_master_redesign",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "6",
+      "when": 1791214000000,
+      "tag": "0007_admin_config_and_masters",
+      "breakpoints": true
     }
   ]
 }

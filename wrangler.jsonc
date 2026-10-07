@@ -15,7 +15,7 @@
     {
       "binding": "DB",
       "database_name": "hr-erp-db",
-      "database_id": "hr-erp-db-local",
+      "database_id": "302dce0a-79a5-429b-ae19-ec275de0f94a",
       "migrations_dir": "drizzle/migrations"
     }
   ],
@@ -26,7 +26,6 @@
     }
   ],
   "vars": {
-    "ENVIRONMENT": "development",
-    "JWT_SECRET": "hr-erp-default-jwt-secret-key-32-chars-minimum"
+    "ENVIRONMENT": "production"
   }
 }

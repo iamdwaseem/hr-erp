@@ -49,6 +49,7 @@ export async function resolveEmployeeAccess(
       .where(
         or(
           eq(employees.userId, user.sub),
+          like(sql`lower(${employees.localEmail})`, user.email.toLowerCase()),
           like(sql`lower(${employees.email})`, user.email.toLowerCase())
         )
       )
@@ -83,24 +84,17 @@ export async function resolveEmployeeAccess(
 
   const employee = rows[0];
 
-  // If user is EMPLOYEE, must be accessing own record
-  if (user.role === ROLES.EMPLOYEE) {
-    const isOwn =
-      employee.userId === user.sub ||
-      (employee.email &&
-        employee.email.toLowerCase() === user.email.toLowerCase());
-
-    if (!isOwn) {
-      return {
-        employee: null,
-        errorResponse: jsonError(
-          c,
-          "FORBIDDEN",
-          "Access denied: You are only authorized to access your own employee documents",
-          403
-        ),
-      };
-    }
+  // Strict backend RBAC: Only ADMIN and HR may access documents
+  if (user.role !== ROLES.ADMIN && user.role !== ROLES.HR) {
+    return {
+      employee: null,
+      errorResponse: jsonError(
+        c,
+        "FORBIDDEN",
+        "Access denied: You are not authorized to access employee documents",
+        403
+      ),
+    };
   }
 
   return { employee };
@@ -108,7 +102,7 @@ export async function resolveEmployeeAccess(
 
 export function checkDocumentWritePermission(c: Context<AppContext>) {
   const user = c.get("user")!;
-  if (user.role === ROLES.MANAGER || user.role === ROLES.EMPLOYEE) {
+  if (user.role !== ROLES.ADMIN && user.role !== ROLES.HR) {
     return jsonError(
       c,
       "FORBIDDEN",

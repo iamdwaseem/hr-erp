@@ -1,5 +1,5 @@
 import { Hono } from "hono";
-import { eq, or, and, isNotNull, like, sql } from "drizzle-orm";
+import { eq, and, isNotNull, like, sql } from "drizzle-orm";
 import type { AppContext } from "../types";
 import { requireAuth } from "../middleware/auth";
 import { ROLES } from "../../shared/constants/roles";
@@ -22,7 +22,7 @@ import type {
   ExpirySummary,
   ExpiringDocumentItem,
 } from "../../shared/types/expiry";
-import { jsonSuccess } from "../utils/response";
+import { jsonSuccess, jsonError } from "../utils/response";
 
 export const expiryRoutes = new Hono<AppContext>();
 
@@ -36,27 +36,6 @@ const STATUS_URGENCY_RANK: Record<DocumentStatus, number> = {
   [DOCUMENT_STATUSES.VALID]: 5,
 };
 
-/**
- * Helper to get the employee ID for an EMPLOYEE role user.
- */
-async function getSelfEmployeeId(
-  db: ReturnType<typeof getDb>,
-  userId: string,
-  email: string
-): Promise<string | null> {
-  const rows = await db
-    .select({ id: employees.id })
-    .from(employees)
-    .where(
-      or(
-        eq(employees.userId, userId),
-        like(sql`lower(${employees.email})`, email.toLowerCase())
-      )
-    )
-    .limit(1);
-
-  return rows[0]?.id || null;
-}
 
 /**
  * GET /api/expiry/summary
@@ -64,25 +43,12 @@ async function getSelfEmployeeId(
  */
 expiryRoutes.get("/summary", async (c) => {
   const user = c.get("user")!;
+  if (user.role !== ROLES.ADMIN && user.role !== ROLES.HR) {
+    return jsonError(c, "FORBIDDEN", "Access denied", 403);
+  }
   const db = getDb(c.env.DB);
 
   let selfEmpId: string | null = null;
-  if (user.role === ROLES.EMPLOYEE) {
-    selfEmpId = await getSelfEmployeeId(db, user.sub, user.email);
-    if (!selfEmpId) {
-      const emptySummary: ExpirySummary = {
-        workforce: { totalEmployees: 0, activeEmployees: 0, inactiveEmployees: 0 },
-        compliance: { expired: 0, expiring7Days: 0, expiring30Days: 0, expiring90Days: 0, valid: 0, total: 0 },
-        byType: {
-          passport: { expired: 0, expiringSoon: 0 },
-          visa: { expired: 0, expiringSoon: 0 },
-          workPermit: { expired: 0, expiringSoon: 0 },
-          uploadedDocuments: { expired: 0, expiringSoon: 0 },
-        },
-      };
-      return jsonSuccess(c, emptySummary);
-    }
-  }
 
   // 1. Workforce Stats
   let totalEmployees = 0;
@@ -248,20 +214,12 @@ expiryRoutes.get("/summary", async (c) => {
  */
 expiryRoutes.get("/documents", async (c) => {
   const user = c.get("user")!;
+  if (user.role !== ROLES.ADMIN && user.role !== ROLES.HR) {
+    return jsonError(c, "FORBIDDEN", "Access denied", 403);
+  }
   const db = getDb(c.env.DB);
 
   let selfEmpId: string | null = null;
-  if (user.role === ROLES.EMPLOYEE) {
-    selfEmpId = await getSelfEmployeeId(db, user.sub, user.email);
-    if (!selfEmpId) {
-      return jsonSuccess(c, [], {
-        page: 1,
-        limit: 20,
-        total: 0,
-        totalPages: 0,
-      });
-    }
-  }
 
   const query = c.req.query();
   const statusFilter = query.status;

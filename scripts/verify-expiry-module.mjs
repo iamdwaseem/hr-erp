@@ -44,7 +44,7 @@ async function runTests() {
     }
   }
 
-  // 1. Authenticate all 4 roles
+  // 1. Authenticate roles per Phase 7B (Admin + 2 HR, Manager & Employee rejected)
   const loginAdmin = await request("/auth/login", {
     method: "POST",
     body: JSON.stringify({ email: "admin@hr-erp.local", password: "AdminPassword123!" }),
@@ -57,21 +57,25 @@ async function runTests() {
   });
   const hrToken = loginHr.data?.data?.token;
 
+  const loginHr2 = await request("/auth/login", {
+    method: "POST",
+    body: JSON.stringify({ email: "hr2@hr-erp.local", password: "Hr2Password123!" }),
+  });
+  const hr2Token = loginHr2.data?.data?.token;
+
   const loginManager = await request("/auth/login", {
     method: "POST",
     body: JSON.stringify({ email: "manager@hr-erp.local", password: "ManagerPassword123!" }),
   });
-  const managerToken = loginManager.data?.data?.token;
 
   const loginEmployee = await request("/auth/login", {
     method: "POST",
     body: JSON.stringify({ email: "employee@hr-erp.local", password: "EmployeePassword123!" }),
   });
-  const employeeToken = loginEmployee.data?.data?.token;
 
   assert(
-    adminToken && hrToken && managerToken && employeeToken,
-    "Auth: All 4 roles authenticated successfully"
+    adminToken && hrToken && hr2Token && loginManager.status === 403 && loginEmployee.status === 403,
+    "Auth: 1 ADMIN + 2 HR authenticated, Manager & Employee logins rejected (Phase 7B)"
   );
 
   // Setup predictable test document records for emp_001 and emp_002
@@ -424,41 +428,36 @@ async function runTests() {
     );
   }
 
-  // Test 18: MANAGER sees authorized company document expiry data
+  // Test 18: HR2 sees authorized company document expiry data
   {
     const res = await request("/expiry/documents", {
-      headers: { Authorization: `Bearer ${managerToken}` },
+      headers: { Authorization: `Bearer ${hr2Token}` },
     });
     assert(
       res.status === 200 && Array.isArray(res.data?.data),
-      "Test 18: MANAGER can view authorized document expiry items",
+      "Test 18: HR2 can view authorized document expiry items",
       `Count: ${res.data?.data?.length}`
     );
   }
 
-  // Test 19: EMPLOYEE sees only own expiry information (no cross-employee leakage)
+  // Test 19: Unauthorized caller cannot view expiry data
   {
     const resDocs = await request("/expiry/documents", {
-      headers: { Authorization: `Bearer ${employeeToken}` },
+      headers: { Authorization: "Bearer invalid_token" },
     });
-    const items = resDocs.data?.data || [];
-    // emp_001 is John Doe (employee's record). emp_002 is Sarah Connor (HR record).
-    const containsOtherEmp = items.some((i) => i.employeeId === "emp_002");
-    const containsOwnEmp = items.some((i) => i.employeeId === "emp_001");
     assert(
-      resDocs.status === 200 && containsOwnEmp && !containsOtherEmp,
-      "Test 19: EMPLOYEE sees only own document expiry records (no other employees)",
-      `ContainsOwn: ${containsOwnEmp}, ContainsOther: ${containsOtherEmp}`
+      resDocs.status === 401 || resDocs.status === 403,
+      "Test 19: Unauthorized caller cannot access expiry documents (receives 401/403)",
+      `Status: ${resDocs.status}`
     );
 
     const resSummary = await request("/expiry/summary", {
-      headers: { Authorization: `Bearer ${employeeToken}` },
+      headers: { Authorization: "Bearer invalid_token" },
     });
-    const empTotal = resSummary.data?.data?.workforce?.totalEmployees;
     assert(
-      resSummary.status === 200 && empTotal === 1,
-      "Test 19b: EMPLOYEE summary is scoped to 1 employee (self-record)",
-      `Total: ${empTotal}`
+      resSummary.status === 401 || resSummary.status === 403,
+      "Test 19b: Unauthorized caller cannot access expiry summary (receives 401/403)",
+      `Status: ${resSummary.status}`
     );
   }
 

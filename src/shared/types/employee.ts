@@ -42,12 +42,42 @@ export interface Employee {
   dateOfBirth: string | null;
   nationality: string | null;
 
-  mobile: string | null;
-  email: string | null;
-  addressLine: string | null;
-  city: string | null;
-  state: string | null;
-  country: string | null;
+  // Local / Work-Country Contact
+  localEmail: string | null;
+  localMobile: string | null;
+  localAddressLine1: string | null;
+  localAddressLine2: string | null;
+  localCity: string | null;
+  localState: string | null;
+  localPostalCode: string | null;
+  localCountry: string | null;
+
+  // Home-Country Contact
+  homeEmail: string | null;
+  homeMobile: string | null;
+  homeAlternatePhone: string | null;
+  homeAddressLine1: string | null;
+  homeAddressLine2: string | null;
+  homeCity: string | null;
+  homeState: string | null;
+  homePostalCode: string | null;
+  homeCountry: string | null;
+
+  // Emergency Contact
+  emergencyContactName: string | null;
+  emergencyContactRelationship: string | null;
+  emergencyContactMobile: string | null;
+  emergencyContactAlternatePhone: string | null;
+  emergencyContactEmail: string | null;
+  emergencyContactAddress: string | null;
+
+  // Legacy Contact (deprecated, retained for backwards compatibility)
+  mobile?: string | null;
+  email?: string | null;
+  addressLine?: string | null;
+  city?: string | null;
+  state?: string | null;
+  country?: string | null;
 
   joiningDate: string;
   departmentId: string | null;
@@ -80,4 +110,9 @@ export interface EmployeeListItem {
   joiningDate: string;
   employmentStatus: EmploymentStatus;
   createdAt: string;
+
+  localEmail?: string | null;
+  localMobile?: string | null;
+  email?: string | null;
+  mobile?: string | null;
 }

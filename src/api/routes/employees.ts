@@ -38,12 +38,12 @@ employeesRoutes.route("/", employeeDocumentVaultRoutes);
 employeesRoutes.get("/", async (c) => {
   const user = c.get("user")!;
 
-  // Strict backend RBAC: Employees cannot browse employee master list
-  if (user.role === ROLES.EMPLOYEE) {
+  // Strict backend RBAC: Only ADMIN and HR can browse employee master list
+  if (user.role !== ROLES.ADMIN && user.role !== ROLES.HR) {
     return jsonError(
       c,
       "FORBIDDEN",
-      "Employees are only authorized to view their own profile",
+      "Access is restricted to Administrator and HR personnel only",
       403
     );
   }
@@ -135,6 +135,10 @@ employeesRoutes.get("/", async (c) => {
         joiningDate: employees.joiningDate,
         employmentStatus: employees.employmentStatus,
         createdAt: employees.createdAt,
+        localEmail: employees.localEmail,
+        localMobile: employees.localMobile,
+        email: employees.email,
+        mobile: employees.mobile,
       })
       .from(employees)
       .leftJoin(departments, eq(employees.departmentId, departments.id))
@@ -183,13 +187,14 @@ employeesRoutes.get("/:id", async (c) => {
     let employeeRecord;
 
     if (paramId === "me") {
-      // Find employee linked by userId or email
+      // Find employee linked by userId or email / localEmail
       const rows = await db
         .select()
         .from(employees)
         .where(
           or(
             eq(employees.userId, user.sub),
+            like(sql`lower(${employees.localEmail})`, user.email.toLowerCase()),
             like(sql`lower(${employees.email})`, user.email.toLowerCase())
           )
         )
@@ -216,21 +221,14 @@ employeesRoutes.get("/:id", async (c) => {
       }
       employeeRecord = rows[0];
 
-      // Strict backend RBAC: If EMPLOYEE role, must match own profile
-      if (user.role === ROLES.EMPLOYEE) {
-        const isOwnProfile =
-          employeeRecord.userId === user.sub ||
-          (employeeRecord.email &&
-            employeeRecord.email.toLowerCase() === user.email.toLowerCase());
-
-        if (!isOwnProfile) {
-          return jsonError(
-            c,
-            "FORBIDDEN",
-            "Access denied: You are only authorized to view your own employee profile",
-            403
-          );
-        }
+      // Strict backend RBAC: Only ADMIN and HR can view employee details
+      if (user.role !== ROLES.ADMIN && user.role !== ROLES.HR) {
+        return jsonError(
+          c,
+          "FORBIDDEN",
+          "Access is restricted to Administrator and HR personnel only",
+          403
+        );
       }
     }
 
@@ -340,6 +338,13 @@ employeesRoutes.post("/", requireRole(ROLES.ADMIN, ROLES.HR), async (c) => {
     const newId = `emp_${crypto.randomUUID().replace(/-/g, "").slice(0, 12)}`;
     const now = new Date().toISOString();
 
+    const resolvedLocalEmail = data.localEmail || data.email || null;
+    const resolvedLocalMobile = data.localMobile || data.mobile || null;
+    const resolvedLocalAddress1 = data.localAddressLine1 || data.addressLine || null;
+    const resolvedLocalCity = data.localCity || data.city || null;
+    const resolvedLocalState = data.localState || data.state || null;
+    const resolvedLocalCountry = data.localCountry || data.country || null;
+
     await db.insert(employees).values({
       id: newId,
       userId: data.userId || null,
@@ -350,12 +355,44 @@ employeesRoutes.post("/", requireRole(ROLES.ADMIN, ROLES.HR), async (c) => {
       gender: data.gender || null,
       dateOfBirth: data.dateOfBirth || null,
       nationality: data.nationality || null,
-      mobile: data.mobile || null,
-      email: data.email || null,
-      addressLine: data.addressLine || null,
-      city: data.city || null,
-      state: data.state || null,
-      country: data.country || null,
+
+      // Local / Work-Country Contact
+      localEmail: resolvedLocalEmail,
+      localMobile: resolvedLocalMobile,
+      localAddressLine1: resolvedLocalAddress1,
+      localAddressLine2: data.localAddressLine2 || null,
+      localCity: resolvedLocalCity,
+      localState: resolvedLocalState,
+      localPostalCode: data.localPostalCode || null,
+      localCountry: resolvedLocalCountry,
+
+      // Home-Country Contact
+      homeEmail: data.homeEmail || null,
+      homeMobile: data.homeMobile || null,
+      homeAlternatePhone: data.homeAlternatePhone || null,
+      homeAddressLine1: data.homeAddressLine1 || null,
+      homeAddressLine2: data.homeAddressLine2 || null,
+      homeCity: data.homeCity || null,
+      homeState: data.homeState || null,
+      homePostalCode: data.homePostalCode || null,
+      homeCountry: data.homeCountry || null,
+
+      // Emergency Contact
+      emergencyContactName: data.emergencyContactName || null,
+      emergencyContactRelationship: data.emergencyContactRelationship || null,
+      emergencyContactMobile: data.emergencyContactMobile || null,
+      emergencyContactAlternatePhone: data.emergencyContactAlternatePhone || null,
+      emergencyContactEmail: data.emergencyContactEmail || null,
+      emergencyContactAddress: data.emergencyContactAddress || null,
+
+      // Legacy Contact (sync with local)
+      mobile: resolvedLocalMobile,
+      email: resolvedLocalEmail,
+      addressLine: resolvedLocalAddress1,
+      city: resolvedLocalCity,
+      state: resolvedLocalState,
+      country: resolvedLocalCountry,
+
       joiningDate: data.joiningDate,
       departmentId: data.departmentId || null,
       designationId: data.designationId || null,
@@ -497,12 +534,68 @@ employeesRoutes.put("/:id", requireRole(ROLES.ADMIN, ROLES.HR), async (c) => {
         ...(data.gender !== undefined && { gender: data.gender || null }),
         ...(data.dateOfBirth !== undefined && { dateOfBirth: data.dateOfBirth || null }),
         ...(data.nationality !== undefined && { nationality: data.nationality || null }),
-        ...(data.mobile !== undefined && { mobile: data.mobile || null }),
-        ...(data.email !== undefined && { email: data.email || null }),
-        ...(data.addressLine !== undefined && { addressLine: data.addressLine || null }),
-        ...(data.city !== undefined && { city: data.city || null }),
-        ...(data.state !== undefined && { state: data.state || null }),
-        ...(data.country !== undefined && { country: data.country || null }),
+
+        // Local / Work-Country Contact
+        ...((data.localEmail !== undefined || data.email !== undefined) && {
+          localEmail: data.localEmail !== undefined ? (data.localEmail || null) : (data.email || null),
+        }),
+        ...((data.localMobile !== undefined || data.mobile !== undefined) && {
+          localMobile: data.localMobile !== undefined ? (data.localMobile || null) : (data.mobile || null),
+        }),
+        ...((data.localAddressLine1 !== undefined || data.addressLine !== undefined) && {
+          localAddressLine1: data.localAddressLine1 !== undefined ? (data.localAddressLine1 || null) : (data.addressLine || null),
+        }),
+        ...(data.localAddressLine2 !== undefined && { localAddressLine2: data.localAddressLine2 || null }),
+        ...((data.localCity !== undefined || data.city !== undefined) && {
+          localCity: data.localCity !== undefined ? (data.localCity || null) : (data.city || null),
+        }),
+        ...((data.localState !== undefined || data.state !== undefined) && {
+          localState: data.localState !== undefined ? (data.localState || null) : (data.state || null),
+        }),
+        ...(data.localPostalCode !== undefined && { localPostalCode: data.localPostalCode || null }),
+        ...((data.localCountry !== undefined || data.country !== undefined) && {
+          localCountry: data.localCountry !== undefined ? (data.localCountry || null) : (data.country || null),
+        }),
+
+        // Home-Country Contact
+        ...(data.homeEmail !== undefined && { homeEmail: data.homeEmail || null }),
+        ...(data.homeMobile !== undefined && { homeMobile: data.homeMobile || null }),
+        ...(data.homeAlternatePhone !== undefined && { homeAlternatePhone: data.homeAlternatePhone || null }),
+        ...(data.homeAddressLine1 !== undefined && { homeAddressLine1: data.homeAddressLine1 || null }),
+        ...(data.homeAddressLine2 !== undefined && { homeAddressLine2: data.homeAddressLine2 || null }),
+        ...(data.homeCity !== undefined && { homeCity: data.homeCity || null }),
+        ...(data.homeState !== undefined && { homeState: data.homeState || null }),
+        ...(data.homePostalCode !== undefined && { homePostalCode: data.homePostalCode || null }),
+        ...(data.homeCountry !== undefined && { homeCountry: data.homeCountry || null }),
+
+        // Emergency Contact
+        ...(data.emergencyContactName !== undefined && { emergencyContactName: data.emergencyContactName || null }),
+        ...(data.emergencyContactRelationship !== undefined && { emergencyContactRelationship: data.emergencyContactRelationship || null }),
+        ...(data.emergencyContactMobile !== undefined && { emergencyContactMobile: data.emergencyContactMobile || null }),
+        ...(data.emergencyContactAlternatePhone !== undefined && { emergencyContactAlternatePhone: data.emergencyContactAlternatePhone || null }),
+        ...(data.emergencyContactEmail !== undefined && { emergencyContactEmail: data.emergencyContactEmail || null }),
+        ...(data.emergencyContactAddress !== undefined && { emergencyContactAddress: data.emergencyContactAddress || null }),
+
+        // Legacy Contact sync
+        ...((data.localEmail !== undefined || data.email !== undefined) && {
+          email: data.localEmail !== undefined ? (data.localEmail || null) : (data.email || null),
+        }),
+        ...((data.localMobile !== undefined || data.mobile !== undefined) && {
+          mobile: data.localMobile !== undefined ? (data.localMobile || null) : (data.mobile || null),
+        }),
+        ...((data.localAddressLine1 !== undefined || data.addressLine !== undefined) && {
+          addressLine: data.localAddressLine1 !== undefined ? (data.localAddressLine1 || null) : (data.addressLine || null),
+        }),
+        ...((data.localCity !== undefined || data.city !== undefined) && {
+          city: data.localCity !== undefined ? (data.localCity || null) : (data.city || null),
+        }),
+        ...((data.localState !== undefined || data.state !== undefined) && {
+          state: data.localState !== undefined ? (data.localState || null) : (data.state || null),
+        }),
+        ...((data.localCountry !== undefined || data.country !== undefined) && {
+          country: data.localCountry !== undefined ? (data.localCountry || null) : (data.country || null),
+        }),
+
         ...(data.joiningDate !== undefined && { joiningDate: data.joiningDate }),
         ...(data.departmentId !== undefined && { departmentId: data.departmentId || null }),
         ...(data.designationId !== undefined && { designationId: data.designationId || null }),

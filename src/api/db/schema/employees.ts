@@ -20,7 +20,36 @@ export const employees = sqliteTable(
     dateOfBirth: text("date_of_birth"),
     nationality: text("nationality"),
 
-    // Contact
+    // Local / Work-Country Contact
+    localEmail: text("local_email"),
+    localMobile: text("local_mobile"),
+    localAddressLine1: text("local_address_line_1"),
+    localAddressLine2: text("local_address_line_2"),
+    localCity: text("local_city"),
+    localState: text("local_state"),
+    localPostalCode: text("local_postal_code"),
+    localCountry: text("local_country"),
+
+    // Home-Country Contact
+    homeEmail: text("home_email"),
+    homeMobile: text("home_mobile"),
+    homeAlternatePhone: text("home_alternate_phone"),
+    homeAddressLine1: text("home_address_line_1"),
+    homeAddressLine2: text("home_address_line_2"),
+    homeCity: text("home_city"),
+    homeState: text("home_state"),
+    homePostalCode: text("home_postal_code"),
+    homeCountry: text("home_country"),
+
+    // Emergency Contact
+    emergencyContactName: text("emergency_contact_name"),
+    emergencyContactRelationship: text("emergency_contact_relationship"),
+    emergencyContactMobile: text("emergency_contact_mobile"),
+    emergencyContactAlternatePhone: text("emergency_contact_alternate_phone"),
+    emergencyContactEmail: text("emergency_contact_email"),
+    emergencyContactAddress: text("emergency_contact_address"),
+
+    // Legacy Contact (retained for backwards compatibility)
     mobile: text("mobile"),
     email: text("email"),
     addressLine: text("address_line"),
@@ -49,6 +78,7 @@ export const employees = sqliteTable(
     statusIdx: index("emp_status_idx").on(table.employmentStatus),
     nationalityIdx: index("emp_nationality_idx").on(table.nationality),
     userIdIdx: index("emp_user_id_idx").on(table.userId),
+    localEmailIdx: index("emp_local_email_idx").on(table.localEmail),
   })
 );
 

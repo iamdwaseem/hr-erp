@@ -1,8 +1,17 @@
 import React from "react";
-import { LayoutDashboard, Users, AlertCircle, History, Shield, X, User as UserIcon } from "lucide-react";
+import {
+  LayoutDashboard,
+  Users,
+  AlertCircle,
+  History,
+  Shield,
+  X,
+  UserCog,
+  Database,
+} from "lucide-react";
 import { useAuth } from "../../hooks/use-auth";
 import { cn } from "../../lib/utils";
-import { ROLES, type UserRole, PERMISSIONS } from "../../../shared/constants/roles";
+import { type UserRole, PERMISSIONS } from "../../../shared/constants/roles";
 
 export interface NavItem {
   title: string;
@@ -21,31 +30,34 @@ const navItems: NavItem[] = [
     icon: LayoutDashboard,
   },
   {
-    title: "My Profile",
-    href: "/profile",
-    icon: UserIcon,
-    roles: [ROLES.EMPLOYEE],
-  },
-  {
     title: "Employee Master",
     href: "/employees",
     icon: Users,
     permission: PERMISSIONS.EMPLOYEE_READ,
-    excludeRoles: [ROLES.EMPLOYEE],
   },
   {
     title: "HR Action Center",
     href: "/action-center",
     icon: AlertCircle,
     badge: "Alerts",
-    excludeRoles: [ROLES.EMPLOYEE],
   },
   {
     title: "Audit Log",
     href: "/audit-log",
     icon: History,
     permission: PERMISSIONS.AUDIT_READ,
-    excludeRoles: [ROLES.EMPLOYEE],
+  },
+  {
+    title: "User Management",
+    href: "/settings/users",
+    icon: UserCog,
+    permission: PERMISSIONS.USER_MANAGE,
+  },
+  {
+    title: "Master Configuration",
+    href: "/settings/masters",
+    icon: Database,
+    permission: PERMISSIONS.MASTER_MANAGE,
   },
 ];
 

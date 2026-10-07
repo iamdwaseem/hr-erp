@@ -39,7 +39,7 @@ async function runTests() {
     }
   }
 
-  // 1. Authenticate all 4 roles
+  // 1. Authenticate roles per Phase 7B (Admin + 2 HR, Manager & Employee rejected)
   const loginAdmin = await request("/auth/login", {
     method: "POST",
     body: JSON.stringify({ email: "admin@hr-erp.local", password: "AdminPassword123!" }),
@@ -52,21 +52,25 @@ async function runTests() {
   });
   const hrToken = loginHr.data?.data?.token;
 
+  const loginHr2 = await request("/auth/login", {
+    method: "POST",
+    body: JSON.stringify({ email: "hr2@hr-erp.local", password: "Hr2Password123!" }),
+  });
+  const hr2Token = loginHr2.data?.data?.token;
+
   const loginManager = await request("/auth/login", {
     method: "POST",
     body: JSON.stringify({ email: "manager@hr-erp.local", password: "ManagerPassword123!" }),
   });
-  const managerToken = loginManager.data?.data?.token;
 
   const loginEmployee = await request("/auth/login", {
     method: "POST",
     body: JSON.stringify({ email: "employee@hr-erp.local", password: "EmployeePassword123!" }),
   });
-  const employeeToken = loginEmployee.data?.data?.token;
 
   assert(
-    adminToken && hrToken && managerToken && employeeToken,
-    "Auth: All 4 roles authenticated successfully"
+    adminToken && hrToken && hr2Token && loginManager.status === 403 && loginEmployee.status === 403,
+    "Auth: 1 ADMIN + 2 HR authenticated, Manager & Employee logins rejected (Phase 7B)"
   );
 
   // Prepare dummy valid files
@@ -126,7 +130,7 @@ async function runTests() {
     );
   }
 
-  // 4. Test 3: MANAGER cannot upload document (403)
+  // 4. Test 3: Unauthorized manager cannot upload document (receives 401/403)
   {
     const form = new FormData();
     form.append("file", new Blob([pdfBytes], { type: "application/pdf" }), "mgr_test.pdf");
@@ -134,18 +138,18 @@ async function runTests() {
 
     const res = await request("/employees/emp_001/documents", {
       method: "POST",
-      headers: { Authorization: `Bearer ${managerToken}` },
+      headers: { Authorization: "Bearer invalid_manager_token" },
       body: form,
     });
 
     assert(
-      res.status === 403,
-      "Test 3: MANAGER cannot upload document (receives 403)",
+      res.status === 401 || res.status === 403,
+      "Test 3: Unauthorized manager cannot upload document (receives 401/403)",
       `Status ${res.status}`
     );
   }
 
-  // 5. Test 4: EMPLOYEE cannot upload document (403)
+  // 5. Test 4: Unauthorized employee cannot upload document (receives 401/403)
   {
     const form = new FormData();
     form.append("file", new Blob([pdfBytes], { type: "application/pdf" }), "emp_self.pdf");
@@ -153,13 +157,13 @@ async function runTests() {
 
     const res = await request("/employees/emp_001/documents", {
       method: "POST",
-      headers: { Authorization: `Bearer ${employeeToken}` },
+      headers: { Authorization: "Bearer invalid_employee_token" },
       body: form,
     });
 
     assert(
-      res.status === 403,
-      "Test 4: EMPLOYEE cannot upload document (receives 403)",
+      res.status === 401 || res.status === 403,
+      "Test 4: Unauthorized employee cannot upload document (receives 401/403)",
       `Status ${res.status}`
     );
   }
@@ -204,38 +208,38 @@ async function runTests() {
     );
   }
 
-  // 9. Test 8: MANAGER can view authorized documents
+  // 9. Test 8: HR2 can view employee documents
   {
     const res = await request("/employees/emp_001/documents", {
-      headers: { Authorization: `Bearer ${managerToken}` },
+      headers: { Authorization: `Bearer ${hr2Token}` },
     });
     assert(
       res.status === 200 && Array.isArray(res.data?.data),
-      "Test 8: MANAGER can view authorized documents",
+      "Test 8: HR2 can view employee documents",
       JSON.stringify(res.data)
     );
   }
 
-  // 10. Test 9: EMPLOYEE can view own documents via /me/documents
+  // 10. Test 9: EMPLOYEE self-service profile access disabled per Phase 7B
   {
     const res = await request("/employees/me/documents", {
-      headers: { Authorization: `Bearer ${employeeToken}` },
+      headers: { Authorization: "Bearer invalid_employee_token" },
     });
     assert(
-      res.status === 200 && Array.isArray(res.data?.data),
-      "Test 9: EMPLOYEE can view own documents via /me/documents",
-      JSON.stringify(res.data)
+      res.status === 401 || res.status === 403,
+      "Test 9: EMPLOYEE self-service access disabled per Phase 7B (receives 401/403)",
+      `Status ${res.status}`
     );
   }
 
-  // 11. Test 10: EMPLOYEE cannot view another employee's documents (403)
+  // 11. Test 10: Unauthorized caller cannot view employee documents (401/403)
   {
     const res = await request("/employees/emp_002/documents", {
-      headers: { Authorization: `Bearer ${employeeToken}` },
+      headers: { Authorization: "Bearer invalid_token" },
     });
     assert(
-      res.status === 403,
-      "Test 10: EMPLOYEE cannot view another employee's documents (receives 403)",
+      res.status === 401 || res.status === 403,
+      "Test 10: Unauthorized caller cannot view employee documents (receives 401/403)",
       `Status ${res.status}`
     );
   }
@@ -255,14 +259,14 @@ async function runTests() {
     );
   }
 
-  // 13. Test 12: Unauthorized download fails (EMPLOYEE downloading emp_002's doc)
+  // 13. Test 12: Unauthorized download fails with 401/403
   {
     const res = await request(`/employees/emp_002/documents/${adminDocId}/download`, {
-      headers: { Authorization: `Bearer ${employeeToken}` },
+      headers: { Authorization: "Bearer invalid_token" },
     });
     assert(
-      res.status === 403,
-      "Test 12: Unauthorized download fails with 403 Forbidden",
+      res.status === 401 || res.status === 403,
+      "Test 12: Unauthorized download fails with 401/403 Forbidden",
       `Status ${res.status}`
     );
   }
@@ -295,56 +299,56 @@ async function runTests() {
     );
   }
 
-  // 16. Test 15: MANAGER cannot change verification (403)
+  // 16. Test 15: Unauthorized manager cannot change verification (401/403)
   {
     const res = await request(`/employees/emp_001/documents/${adminDocId}/verification`, {
       method: "PUT",
-      headers: { Authorization: `Bearer ${managerToken}` },
+      headers: { Authorization: "Bearer invalid_manager_token" },
       body: JSON.stringify({ status: "VERIFIED" }),
     });
     assert(
-      res.status === 403,
-      "Test 15: MANAGER cannot change verification (receives 403)",
+      res.status === 401 || res.status === 403,
+      "Test 15: Unauthorized manager cannot change verification (receives 401/403)",
       `Status ${res.status}`
     );
   }
 
-  // 17. Test 16: EMPLOYEE cannot change verification (403)
+  // 17. Test 16: Unauthorized employee cannot change verification (401/403)
   {
     const res = await request(`/employees/emp_001/documents/${adminDocId}/verification`, {
       method: "PUT",
-      headers: { Authorization: `Bearer ${employeeToken}` },
+      headers: { Authorization: "Bearer invalid_employee_token" },
       body: JSON.stringify({ status: "VERIFIED" }),
     });
     assert(
-      res.status === 403,
-      "Test 16: EMPLOYEE cannot change verification (receives 403)",
+      res.status === 401 || res.status === 403,
+      "Test 16: Unauthorized employee cannot change verification (receives 401/403)",
       `Status ${res.status}`
     );
   }
 
-  // 18. Test 17: MANAGER cannot delete document (403)
+  // 18. Test 17: Unauthorized manager cannot delete document (401/403)
   {
     const res = await request(`/employees/emp_001/documents/${hrDocId}`, {
       method: "DELETE",
-      headers: { Authorization: `Bearer ${managerToken}` },
+      headers: { Authorization: "Bearer invalid_manager_token" },
     });
     assert(
-      res.status === 403,
-      "Test 17: MANAGER cannot delete document (receives 403)",
+      res.status === 401 || res.status === 403,
+      "Test 17: Unauthorized manager cannot delete document (receives 401/403)",
       `Status ${res.status}`
     );
   }
 
-  // 19. Test 18: EMPLOYEE cannot delete document (403)
+  // 19. Test 18: Unauthorized employee cannot delete document (401/403)
   {
     const res = await request(`/employees/emp_001/documents/${hrDocId}`, {
       method: "DELETE",
-      headers: { Authorization: `Bearer ${employeeToken}` },
+      headers: { Authorization: "Bearer invalid_employee_token" },
     });
     assert(
-      res.status === 403,
-      "Test 18: EMPLOYEE cannot delete document (receives 403)",
+      res.status === 401 || res.status === 403,
+      "Test 18: Unauthorized employee cannot delete document (receives 401/403)",
       `Status ${res.status}`
     );
   }

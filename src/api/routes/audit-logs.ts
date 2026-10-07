@@ -12,8 +12,8 @@ import type { AuditLogEntry, AuditActor } from "../../shared/types/audit";
 
 export const auditLogsRoutes = new Hono<AppContext>();
 
-// Strict Backend RBAC: Only ADMIN and HR may access audit logs
-auditLogsRoutes.use("*", requireAuth(), requireRole(ROLES.ADMIN, ROLES.HR));
+// Strict Backend RBAC: Only ADMIN may access audit logs (Phase 7B requirement)
+auditLogsRoutes.use("*", requireAuth(), requireRole(ROLES.ADMIN));
 
 const SENSITIVE_KEY_PATTERNS = [
   /password/i,

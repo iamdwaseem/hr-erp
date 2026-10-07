@@ -21,7 +21,40 @@ export const employeeQuerySchema = z.object({
 
 export type EmployeeQueryInput = z.infer<typeof employeeQuerySchema>;
 
+export const optionalPhoneSchema = z
+  .string()
+  .trim()
+  .regex(/^[+0-9\s\-()]{7,25}$/, "Invalid phone/mobile number")
+  .optional()
+  .or(z.literal(""))
+  .nullable();
+
+export const optionalEmailSchema = z
+  .string()
+  .trim()
+  .email("Invalid email address")
+  .optional()
+  .or(z.literal(""))
+  .nullable();
+
+export const optionalDateStringSchema = z
+  .string()
+  .trim()
+  .optional()
+  .or(z.literal(""))
+  .nullable()
+  .refine(
+    (val) => {
+      if (!val) return true;
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(val)) return false;
+      const d = new Date(val);
+      return !isNaN(d.getTime());
+    },
+    { message: "Date must be a valid date in YYYY-MM-DD format" }
+  );
+
 export const createEmployeeSchema = z.object({
+  // Identification
   employeeCode: z
     .string()
     .trim()
@@ -44,28 +77,47 @@ export const createEmployeeSchema = z.object({
     .or(z.literal(""))
     .nullable(),
   gender: z.string().optional().nullable(),
-  dateOfBirth: z.string().optional().nullable(),
-  nationality: z.string().optional().nullable(),
+  dateOfBirth: optionalDateStringSchema,
+  nationality: z.string().trim().optional().nullable(),
 
-  mobile: z
-    .string()
-    .trim()
-    .regex(/^[+0-9\s\-()]{7,20}$/, "Invalid phone/mobile number")
-    .optional()
-    .or(z.literal(""))
-    .nullable(),
-  email: z
-    .string()
-    .trim()
-    .email("Invalid email address")
-    .optional()
-    .or(z.literal(""))
-    .nullable(),
-  addressLine: z.string().optional().nullable(),
-  city: z.string().optional().nullable(),
-  state: z.string().optional().nullable(),
-  country: z.string().optional().nullable(),
+  // Local / Work-Country Contact
+  localEmail: optionalEmailSchema,
+  localMobile: optionalPhoneSchema,
+  localAddressLine1: z.string().trim().optional().nullable(),
+  localAddressLine2: z.string().trim().optional().nullable(),
+  localCity: z.string().trim().optional().nullable(),
+  localState: z.string().trim().optional().nullable(),
+  localPostalCode: z.string().trim().max(20, "Postal Code too long").optional().nullable(),
+  localCountry: z.string().trim().optional().nullable(),
 
+  // Home-Country Contact
+  homeEmail: optionalEmailSchema,
+  homeMobile: optionalPhoneSchema,
+  homeAlternatePhone: optionalPhoneSchema,
+  homeAddressLine1: z.string().trim().optional().nullable(),
+  homeAddressLine2: z.string().trim().optional().nullable(),
+  homeCity: z.string().trim().optional().nullable(),
+  homeState: z.string().trim().optional().nullable(),
+  homePostalCode: z.string().trim().max(20, "Postal Code too long").optional().nullable(),
+  homeCountry: z.string().trim().optional().nullable(),
+
+  // Emergency Contact
+  emergencyContactName: z.string().trim().optional().nullable(),
+  emergencyContactRelationship: z.string().trim().optional().nullable(),
+  emergencyContactMobile: optionalPhoneSchema,
+  emergencyContactAlternatePhone: optionalPhoneSchema,
+  emergencyContactEmail: optionalEmailSchema,
+  emergencyContactAddress: z.string().trim().optional().nullable(),
+
+  // Legacy Contact (accepted for backwards compatibility)
+  mobile: optionalPhoneSchema,
+  email: optionalEmailSchema,
+  addressLine: z.string().trim().optional().nullable(),
+  city: z.string().trim().optional().nullable(),
+  state: z.string().trim().optional().nullable(),
+  country: z.string().trim().optional().nullable(),
+
+  // Employment
   joiningDate: z
     .string()
     .min(1, "Joining Date is required")

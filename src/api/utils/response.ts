@@ -5,15 +5,23 @@ import type { ApiResponse, ApiMeta } from "../../shared/types/api";
 export function jsonSuccess<T>(
   c: Context,
   data: T,
-  meta?: ApiMeta,
+  metaOrStatus?: ApiMeta | ContentfulStatusCode,
   status: ContentfulStatusCode = 200
 ) {
+  let meta: ApiMeta | undefined;
+  let finalStatus: ContentfulStatusCode = status;
+  if (typeof metaOrStatus === "number") {
+    finalStatus = metaOrStatus as ContentfulStatusCode;
+  } else if (metaOrStatus) {
+    meta = metaOrStatus;
+  }
+
   const payload: ApiResponse<T> = {
     success: true,
     data,
     ...(meta ? { meta } : {}),
   };
-  return c.json(payload, status);
+  return c.json(payload, finalStatus);
 }
 
 export function jsonError(

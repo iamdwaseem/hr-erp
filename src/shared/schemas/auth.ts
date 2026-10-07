@@ -24,12 +24,7 @@ export const registerUserSchema = z.object({
   fullName: z
     .string()
     .min(2, "Full name must be at least 2 characters"),
-  role: z.enum([
-    ROLES.ADMIN,
-    ROLES.HR,
-    ROLES.MANAGER,
-    ROLES.EMPLOYEE,
-  ]),
+  role: z.enum([ROLES.ADMIN, ROLES.HR]),
 });
 
 export type RegisterUserInput = z.infer<typeof registerUserSchema>;

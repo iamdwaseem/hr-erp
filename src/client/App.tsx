@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { queryClient } from "./lib/query-client";
 import { AuthProvider, useAuth } from "./context/auth-context";
@@ -8,13 +8,15 @@ import { EmployeesPage } from "./pages/employees";
 import { EmployeeProfile, type ProfileTabType } from "./pages/employees/employee-profile";
 import { ActionCenterPage } from "./pages/action-center";
 import { AuditLogPage } from "./pages/audit-log";
+import { UsersPage } from "./pages/settings/users-page";
+import { MastersPage } from "./pages/settings/masters-page";
 import { NotFoundPage } from "./pages/not-found";
 import { AppLayout } from "./components/layout/app-layout";
 import { ProtectedRoute } from "./components/layout/protected-route";
-import { PERMISSIONS, ROLES } from "../shared/constants/roles";
+import { PERMISSIONS } from "../shared/constants/roles";
 
 const AppContent: React.FC = () => {
-  const { user, isAuthenticated, isLoading } = useAuth();
+  const { isAuthenticated, isLoading } = useAuth();
   const [currentPath, setCurrentPath] = useState<string>("/dashboard");
   const [viewEmployeeId, setViewEmployeeId] = useState<string | null>(null);
   const [viewEmployeeTab, setViewEmployeeTab] = useState<ProfileTabType | undefined>(undefined);
@@ -23,13 +25,6 @@ const AppContent: React.FC = () => {
     setViewEmployeeId(employeeId);
     setViewEmployeeTab(initialTab);
   };
-
-  // If logged in as an EMPLOYEE, default path to /profile instead of /dashboard or /employees
-  useEffect(() => {
-    if (user?.role === ROLES.EMPLOYEE && currentPath === "/employees") {
-      setCurrentPath("/profile");
-    }
-  }, [user, currentPath]);
 
   if (isLoading) {
     return (
@@ -98,10 +93,28 @@ const AppContent: React.FC = () => {
             </ProtectedRoute>
           ),
         };
+      case "/settings/users":
+        return {
+          title: "User Management",
+          component: (
+            <ProtectedRoute requiredPermission={PERMISSIONS.USER_MANAGE}>
+              <UsersPage />
+            </ProtectedRoute>
+          ),
+        };
+      case "/settings/masters":
+        return {
+          title: "System Master Configuration",
+          component: (
+            <ProtectedRoute requiredPermission={PERMISSIONS.MASTER_MANAGE}>
+              <MastersPage />
+            </ProtectedRoute>
+          ),
+        };
       default:
         return {
           title: "Not Found",
-          component: <NotFoundPage onGoHome={() => setCurrentPath(user?.role === ROLES.EMPLOYEE ? "/profile" : "/dashboard")} />,
+          component: <NotFoundPage onGoHome={() => setCurrentPath("/dashboard")} />,
         };
     }
   };

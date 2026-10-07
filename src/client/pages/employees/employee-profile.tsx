@@ -18,6 +18,10 @@ import {
   AlertCircle,
   FileCheck2,
   PlusCircle,
+  User,
+  Globe,
+  HeartHandshake,
+  PhoneCall,
 } from "lucide-react";
 import { apiClient } from "../../lib/api-client";
 import { useAuth } from "../../hooks/use-auth";
@@ -41,6 +45,7 @@ import { DocumentVaultTab } from "./document-vault-tab";
 export type ProfileTabType =
   | "overview"
   | "personal"
+  | "contact"
   | "employment"
   | "passport"
   | "visa"
@@ -58,7 +63,7 @@ export const EmployeeProfile: React.FC<EmployeeProfileProps> = ({
   onBack,
   initialTab = "overview",
 }) => {
-  const { user, hasRole } = useAuth();
+  const { hasRole } = useAuth();
   const [activeTab, setActiveTab] = useState<ProfileTabType>(initialTab);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
 
@@ -68,7 +73,7 @@ export const EmployeeProfile: React.FC<EmployeeProfileProps> = ({
   const [isWorkPermitDialogOpen, setIsWorkPermitDialogOpen] = useState(false);
 
   const canEdit = hasRole([ROLES.ADMIN, ROLES.HR]);
-  const isEmployeeRole = user?.role === ROLES.EMPLOYEE;
+  const isEmployeeRole = false;
 
   // 1. Fetch Employee Record
   const {
@@ -149,6 +154,154 @@ export const EmployeeProfile: React.FC<EmployeeProfileProps> = ({
       .toUpperCase()
       .slice(0, 2);
   };
+
+  const renderContactCards = () => (
+    <div className="space-y-6">
+      {/* Local / Work-Country Contact */}
+      <Card>
+        <CardHeader className="pb-3 border-b">
+          <div className="flex items-center gap-2">
+            <MapPin className="h-4 w-4 text-primary" />
+            <CardTitle className="text-base font-semibold">Local / Work-Country Contact</CardTitle>
+          </div>
+          <p className="text-xs text-muted-foreground mt-0.5">
+            Current local residence and work-country communication details
+          </p>
+        </CardHeader>
+        <CardContent className="pt-4">
+          <dl className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+            <div>
+              <dt className="text-xs text-muted-foreground uppercase font-medium">Local Email</dt>
+              <dd className="mt-1 font-medium text-foreground">{employee.localEmail || employee.email || "—"}</dd>
+            </div>
+            <div>
+              <dt className="text-xs text-muted-foreground uppercase font-medium">Local Mobile</dt>
+              <dd className="mt-1 font-medium text-foreground">{employee.localMobile || employee.mobile || "—"}</dd>
+            </div>
+            <div>
+              <dt className="text-xs text-muted-foreground uppercase font-medium">Local City</dt>
+              <dd className="mt-1 font-medium text-foreground">{employee.localCity || employee.city || "—"}</dd>
+            </div>
+            <div>
+              <dt className="text-xs text-muted-foreground uppercase font-medium">Local State / Emirate</dt>
+              <dd className="mt-1 font-medium text-foreground">{employee.localState || employee.state || "—"}</dd>
+            </div>
+            <div>
+              <dt className="text-xs text-muted-foreground uppercase font-medium">Postal / Zip Code</dt>
+              <dd className="mt-1 font-medium text-foreground">{employee.localPostalCode || "—"}</dd>
+            </div>
+            <div>
+              <dt className="text-xs text-muted-foreground uppercase font-medium">Local Country</dt>
+              <dd className="mt-1 font-medium text-foreground">{employee.localCountry || employee.country || "—"}</dd>
+            </div>
+            <div className="sm:col-span-2">
+              <dt className="text-xs text-muted-foreground uppercase font-medium">Address Line 1</dt>
+              <dd className="mt-1 font-medium text-foreground">{employee.localAddressLine1 || employee.addressLine || "—"}</dd>
+            </div>
+            <div className="sm:col-span-2">
+              <dt className="text-xs text-muted-foreground uppercase font-medium">Address Line 2</dt>
+              <dd className="mt-1 font-medium text-foreground">{employee.localAddressLine2 || "—"}</dd>
+            </div>
+          </dl>
+        </CardContent>
+      </Card>
+
+      {/* Home-Country Contact */}
+      <Card>
+        <CardHeader className="pb-3 border-b">
+          <div className="flex items-center gap-2">
+            <Globe className="h-4 w-4 text-primary" />
+            <CardTitle className="text-base font-semibold">Home-Country Contact</CardTitle>
+          </div>
+          <p className="text-xs text-muted-foreground mt-0.5">
+            Permanent address and contact details in home country (for expatriate / foreign workforce)
+          </p>
+        </CardHeader>
+        <CardContent className="pt-4">
+          <dl className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+            <div>
+              <dt className="text-xs text-muted-foreground uppercase font-medium">Home Email</dt>
+              <dd className="mt-1 font-medium text-foreground">{employee.homeEmail || "—"}</dd>
+            </div>
+            <div>
+              <dt className="text-xs text-muted-foreground uppercase font-medium">Home Mobile</dt>
+              <dd className="mt-1 font-medium text-foreground">{employee.homeMobile || "—"}</dd>
+            </div>
+            <div>
+              <dt className="text-xs text-muted-foreground uppercase font-medium">Alternate Phone</dt>
+              <dd className="mt-1 font-medium text-foreground">{employee.homeAlternatePhone || "—"}</dd>
+            </div>
+            <div>
+              <dt className="text-xs text-muted-foreground uppercase font-medium">Home Country</dt>
+              <dd className="mt-1 font-medium text-foreground">{employee.homeCountry || "—"}</dd>
+            </div>
+            <div>
+              <dt className="text-xs text-muted-foreground uppercase font-medium">City</dt>
+              <dd className="mt-1 font-medium text-foreground">{employee.homeCity || "—"}</dd>
+            </div>
+            <div>
+              <dt className="text-xs text-muted-foreground uppercase font-medium">State / Province</dt>
+              <dd className="mt-1 font-medium text-foreground">{employee.homeState || "—"}</dd>
+            </div>
+            <div>
+              <dt className="text-xs text-muted-foreground uppercase font-medium">Postal / Zip Code</dt>
+              <dd className="mt-1 font-medium text-foreground">{employee.homePostalCode || "—"}</dd>
+            </div>
+            <div className="hidden sm:block" />
+            <div className="sm:col-span-2">
+              <dt className="text-xs text-muted-foreground uppercase font-medium">Address Line 1</dt>
+              <dd className="mt-1 font-medium text-foreground">{employee.homeAddressLine1 || "—"}</dd>
+            </div>
+            <div className="sm:col-span-2">
+              <dt className="text-xs text-muted-foreground uppercase font-medium">Address Line 2</dt>
+              <dd className="mt-1 font-medium text-foreground">{employee.homeAddressLine2 || "—"}</dd>
+            </div>
+          </dl>
+        </CardContent>
+      </Card>
+
+      {/* Emergency Contact */}
+      <Card>
+        <CardHeader className="pb-3 border-b">
+          <div className="flex items-center gap-2">
+            <HeartHandshake className="h-4 w-4 text-primary" />
+            <CardTitle className="text-base font-semibold">Emergency Contact</CardTitle>
+          </div>
+          <p className="text-xs text-muted-foreground mt-0.5">
+            Designated contact person and details in case of critical incident or emergency
+          </p>
+        </CardHeader>
+        <CardContent className="pt-4">
+          <dl className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 text-sm">
+            <div>
+              <dt className="text-xs text-muted-foreground uppercase font-medium">Contact Person Name</dt>
+              <dd className="mt-1 font-medium text-foreground">{employee.emergencyContactName || "—"}</dd>
+            </div>
+            <div>
+              <dt className="text-xs text-muted-foreground uppercase font-medium">Relationship</dt>
+              <dd className="mt-1 font-medium text-foreground capitalize">{employee.emergencyContactRelationship || "—"}</dd>
+            </div>
+            <div>
+              <dt className="text-xs text-muted-foreground uppercase font-medium">Emergency Mobile</dt>
+              <dd className="mt-1 font-medium text-foreground">{employee.emergencyContactMobile || "—"}</dd>
+            </div>
+            <div>
+              <dt className="text-xs text-muted-foreground uppercase font-medium">Alternate Phone</dt>
+              <dd className="mt-1 font-medium text-foreground">{employee.emergencyContactAlternatePhone || "—"}</dd>
+            </div>
+            <div>
+              <dt className="text-xs text-muted-foreground uppercase font-medium">Email Address</dt>
+              <dd className="mt-1 font-medium text-foreground">{employee.emergencyContactEmail || "—"}</dd>
+            </div>
+            <div className="sm:col-span-2 md:col-span-3">
+              <dt className="text-xs text-muted-foreground uppercase font-medium">Emergency Physical Address</dt>
+              <dd className="mt-1 font-medium text-foreground">{employee.emergencyContactAddress || "—"}</dd>
+            </div>
+          </dl>
+        </CardContent>
+      </Card>
+    </div>
+  );
 
   return (
     <div className="space-y-6">
@@ -244,7 +397,8 @@ export const EmployeeProfile: React.FC<EmployeeProfileProps> = ({
         <div className="flex gap-2 overflow-x-auto pb-px">
           {[
             { id: "overview", label: "Overview", icon: ShieldCheck },
-            { id: "personal", label: "Personal", icon: Briefcase },
+            { id: "personal", label: "Personal", icon: User },
+            { id: "contact", label: "Contact & Emergency", icon: PhoneCall },
             { id: "employment", label: "Employment", icon: Building },
             { id: "passport", label: "Passport", icon: Plane },
             { id: "visa", label: "Visa", icon: FileText },
@@ -276,26 +430,45 @@ export const EmployeeProfile: React.FC<EmployeeProfileProps> = ({
         <div className="grid gap-6 md:grid-cols-2">
           {/* Contact summary */}
           <Card>
-            <CardHeader className="pb-3">
+            <CardHeader className="pb-3 flex flex-row items-center justify-between">
               <CardTitle className="text-base font-semibold">Contact Overview</CardTitle>
+              <Badge variant="outline" className="text-xs">Local & Emergency</Badge>
             </CardHeader>
             <CardContent className="space-y-3 text-sm">
               <div className="flex items-center gap-3">
                 <Mail className="h-4 w-4 text-muted-foreground shrink-0" />
-                <span className="text-foreground">{employee.email || "No email registered"}</span>
+                <span className="text-foreground">{employee.localEmail || employee.email || "No local email registered"}</span>
               </div>
               <div className="flex items-center gap-3">
                 <Phone className="h-4 w-4 text-muted-foreground shrink-0" />
-                <span className="text-foreground">{employee.mobile || "No mobile registered"}</span>
+                <span className="text-foreground">{employee.localMobile || employee.mobile || "No local mobile registered"}</span>
               </div>
               <div className="flex items-start gap-3">
                 <MapPin className="h-4 w-4 text-muted-foreground shrink-0 mt-0.5" />
                 <span className="text-foreground">
-                  {[employee.addressLine, employee.city, employee.state, employee.country]
+                  {[
+                    employee.localAddressLine1 || employee.addressLine,
+                    employee.localAddressLine2,
+                    employee.localCity || employee.city,
+                    employee.localState || employee.state,
+                    employee.localPostalCode,
+                    employee.localCountry || employee.country
+                  ]
                     .filter(Boolean)
-                    .join(", ") || "No address registered"}
+                    .join(", ") || "No local address registered"}
                 </span>
               </div>
+              {(employee.emergencyContactName || employee.emergencyContactMobile) && (
+                <div className="pt-2 border-t mt-3 flex items-center justify-between text-xs text-muted-foreground">
+                  <span className="flex items-center gap-1.5 font-medium text-foreground">
+                    <HeartHandshake className="h-3.5 w-3.5 text-primary" />
+                    Emergency Contact:
+                  </span>
+                  <span>
+                    {employee.emergencyContactName} ({employee.emergencyContactRelationship || "Contact"}): {employee.emergencyContactMobile || "—"}
+                  </span>
+                </div>
+              )}
             </CardContent>
           </Card>
 
@@ -331,47 +504,53 @@ export const EmployeeProfile: React.FC<EmployeeProfileProps> = ({
 
       {/* Tab Contents: Personal */}
       {activeTab === "personal" && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base font-semibold">Personal Information</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <dl className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6 text-sm">
-              <div>
-                <dt className="text-xs text-muted-foreground uppercase font-medium">Full Name</dt>
-                <dd className="mt-1 font-medium text-foreground">{employee.fullName}</dd>
+        <div className="space-y-6">
+          <Card>
+            <CardHeader className="pb-3 border-b">
+              <div className="flex items-center gap-2">
+                <User className="h-4 w-4 text-primary" />
+                <CardTitle className="text-base font-semibold">Personal Identification</CardTitle>
               </div>
-              <div>
-                <dt className="text-xs text-muted-foreground uppercase font-medium">Gender</dt>
-                <dd className="mt-1 font-medium text-foreground capitalize">{employee.gender || "Not specified"}</dd>
-              </div>
-              <div>
-                <dt className="text-xs text-muted-foreground uppercase font-medium">Date of Birth</dt>
-                <dd className="mt-1 font-medium text-foreground">{employee.dateOfBirth || "Not specified"}</dd>
-              </div>
-              <div>
-                <dt className="text-xs text-muted-foreground uppercase font-medium">Nationality</dt>
-                <dd className="mt-1 font-medium text-foreground">{employee.nationality || "Not specified"}</dd>
-              </div>
-              <div>
-                <dt className="text-xs text-muted-foreground uppercase font-medium">Mobile Number</dt>
-                <dd className="mt-1 font-medium text-foreground">{employee.mobile || "Not specified"}</dd>
-              </div>
-              <div>
-                <dt className="text-xs text-muted-foreground uppercase font-medium">Email Address</dt>
-                <dd className="mt-1 font-medium text-foreground">{employee.email || "Not specified"}</dd>
-              </div>
-              <div className="sm:col-span-2 md:col-span-3">
-                <dt className="text-xs text-muted-foreground uppercase font-medium">Full Address</dt>
-                <dd className="mt-1 font-medium text-foreground">
-                  {[employee.addressLine, employee.city, employee.state, employee.country]
-                    .filter(Boolean)
-                    .join(", ") || "Not specified"}
-                </dd>
-              </div>
-            </dl>
-          </CardContent>
-        </Card>
+            </CardHeader>
+            <CardContent className="pt-4">
+              <dl className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6 text-sm">
+                <div>
+                  <dt className="text-xs text-muted-foreground uppercase font-medium">Full Name</dt>
+                  <dd className="mt-1 font-medium text-foreground">{employee.fullName}</dd>
+                </div>
+                <div>
+                  <dt className="text-xs text-muted-foreground uppercase font-medium">Employee Code</dt>
+                  <dd className="mt-1 font-mono font-medium text-foreground">{employee.employeeCode}</dd>
+                </div>
+                <div>
+                  <dt className="text-xs text-muted-foreground uppercase font-medium">Employee ID</dt>
+                  <dd className="mt-1 font-mono font-medium text-foreground">{employee.employeeId}</dd>
+                </div>
+                <div>
+                  <dt className="text-xs text-muted-foreground uppercase font-medium">Gender</dt>
+                  <dd className="mt-1 font-medium text-foreground capitalize">{employee.gender || "Not specified"}</dd>
+                </div>
+                <div>
+                  <dt className="text-xs text-muted-foreground uppercase font-medium">Date of Birth</dt>
+                  <dd className="mt-1 font-medium text-foreground">{employee.dateOfBirth || "Not specified"}</dd>
+                </div>
+                <div>
+                  <dt className="text-xs text-muted-foreground uppercase font-medium">Nationality</dt>
+                  <dd className="mt-1 font-medium text-foreground">{employee.nationality || "Not specified"}</dd>
+                </div>
+              </dl>
+            </CardContent>
+          </Card>
+
+          {renderContactCards()}
+        </div>
+      )}
+
+      {/* Tab Contents: Contact & Emergency */}
+      {activeTab === "contact" && (
+        <div className="space-y-6">
+          {renderContactCards()}
+        </div>
       )}
 
       {/* Tab Contents: Employment */}

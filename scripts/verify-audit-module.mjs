@@ -38,7 +38,7 @@ async function runTests() {
     }
   }
 
-  // 1. Authenticate all 4 roles
+  // 1. Authenticate roles per Phase 7B (Admin + 2 HR, Manager & Employee rejected)
   const loginAdmin = await request("/auth/login", {
     method: "POST",
     body: JSON.stringify({ email: "admin@hr-erp.local", password: "AdminPassword123!" }),
@@ -55,17 +55,15 @@ async function runTests() {
     method: "POST",
     body: JSON.stringify({ email: "manager@hr-erp.local", password: "ManagerPassword123!" }),
   });
-  const managerToken = loginManager.data?.data?.token;
 
   const loginEmployee = await request("/auth/login", {
     method: "POST",
     body: JSON.stringify({ email: "employee@hr-erp.local", password: "EmployeePassword123!" }),
   });
-  const employeeToken = loginEmployee.data?.data?.token;
 
   assert(
-    adminToken && hrToken && managerToken && employeeToken,
-    "Auth: All 4 roles authenticated successfully"
+    adminToken && hrToken && loginManager.status === 403 && loginEmployee.status === 403,
+    "Auth: 1 ADMIN + HR authenticated, Manager & Employee logins rejected (Phase 7B)"
   );
 
   // Test 1: ADMIN can access audit logs
@@ -80,38 +78,38 @@ async function runTests() {
     );
   }
 
-  // Test 2: HR can access audit logs
+  // Test 2: HR cannot access audit logs per Phase 7B (Admin only)
   {
     const res = await request("/audit-logs", {
       headers: { Authorization: `Bearer ${hrToken}` },
     });
     assert(
-      res.status === 200 && Array.isArray(res.data?.data) && res.data?.meta,
-      "Test 2: HR can access audit logs",
+      res.status === 403,
+      "Test 2: HR cannot access audit logs (receives 403 Forbidden per Phase 7B)",
       `Status: ${res.status}`
     );
   }
 
-  // Test 3: MANAGER gets 403 Forbidden
+  // Test 3: Unauthorized manager receives 401/403
   {
     const res = await request("/audit-logs", {
-      headers: { Authorization: `Bearer ${managerToken}` },
+      headers: { Authorization: `Bearer ${loginManager.data?.data?.token || "invalid-token"}` },
     });
     assert(
-      res.status === 403,
-      "Test 3: MANAGER gets 403 Forbidden for audit logs",
+      res.status === 401 || res.status === 403,
+      "Test 3: Unauthorized manager receives 401/403 for audit logs",
       `Status: ${res.status}`
     );
   }
 
-  // Test 4: EMPLOYEE gets 403 Forbidden
+  // Test 4: Unauthorized employee receives 401/403
   {
     const res = await request("/audit-logs", {
-      headers: { Authorization: `Bearer ${employeeToken}` },
+      headers: { Authorization: `Bearer ${loginEmployee.data?.data?.token || "invalid-token"}` },
     });
     assert(
-      res.status === 403,
-      "Test 4: EMPLOYEE gets 403 Forbidden for audit logs",
+      res.status === 401 || res.status === 403,
+      "Test 4: Unauthorized employee receives 401/403 for audit logs",
       `Status: ${res.status}`
     );
   }

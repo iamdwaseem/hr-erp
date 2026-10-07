@@ -2,9 +2,9 @@ import { useState, useRef, type ChangeEvent, type FormEvent } from "react";
 import {
   DOCUMENT_TYPES,
   DOCUMENT_TYPE_LABELS,
-  type DocumentType,
 } from "../../../shared/types/document";
 import { useUploadDocument } from "../../hooks/use-documents";
+import { useDocumentTypes } from "../../hooks/use-masters";
 import { Button } from "../../components/ui/button";
 import { Input } from "../../components/ui/input";
 import {
@@ -27,7 +27,8 @@ export function UploadDocumentDialog({
   onClose,
   employeeId,
 }: UploadDocumentDialogProps) {
-  const [documentType, setDocumentType] = useState<DocumentType>(DOCUMENT_TYPES.PASSPORT);
+  const { data: masterDocTypes } = useDocumentTypes();
+  const [documentType, setDocumentType] = useState<string>(DOCUMENT_TYPES.PASSPORT);
   const [documentNumber, setDocumentNumber] = useState("");
   const [issueDate, setIssueDate] = useState("");
   const [expiryDate, setExpiryDate] = useState("");
@@ -144,14 +145,20 @@ export function UploadDocumentDialog({
             </label>
             <select
               value={documentType}
-              onChange={(e) => setDocumentType(e.target.value as DocumentType)}
+              onChange={(e) => setDocumentType(e.target.value)}
               className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             >
-              {Object.entries(DOCUMENT_TYPE_LABELS).map(([val, label]) => (
-                <option key={val} value={val}>
-                  {label}
-                </option>
-              ))}
+              {masterDocTypes && masterDocTypes.length > 0
+                ? masterDocTypes.map((dt) => (
+                    <option key={dt.code} value={dt.code}>
+                      {dt.name}
+                    </option>
+                  ))
+                : Object.entries(DOCUMENT_TYPE_LABELS).map(([val, label]) => (
+                    <option key={val} value={val}>
+                      {label}
+                    </option>
+                  ))}
             </select>
           </div>
 
