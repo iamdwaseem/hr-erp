@@ -10,6 +10,7 @@ import { ActionCenterPage } from "./pages/action-center";
 import { AuditLogPage } from "./pages/audit-log";
 import { UsersPage } from "./pages/settings/users-page";
 import { MastersPage } from "./pages/settings/masters-page";
+import { TransportPage } from "./pages/transport";
 import { NotFoundPage } from "./pages/not-found";
 import { AppLayout } from "./components/layout/app-layout";
 import { ProtectedRoute } from "./components/layout/protected-route";
@@ -75,6 +76,15 @@ const AppContent: React.FC = () => {
           component: (
             <ProtectedRoute requiredPermission={PERMISSIONS.EMPLOYEE_READ}>
               <EmployeesPage />
+            </ProtectedRoute>
+          ),
+        };
+      case "/transport":
+        return {
+          title: "Transport Management",
+          component: (
+            <ProtectedRoute requiredPermission={PERMISSIONS.TRANSPORT_READ}>
+              <TransportPage onViewEmployee={handleViewEmployee} />
             </ProtectedRoute>
           ),
         };

@@ -8,6 +8,7 @@ import {
   X,
   UserCog,
   Database,
+  Bus,
 } from "lucide-react";
 import { useAuth } from "../../hooks/use-auth";
 import { cn } from "../../lib/utils";
@@ -34,6 +35,12 @@ const navItems: NavItem[] = [
     href: "/employees",
     icon: Users,
     permission: PERMISSIONS.EMPLOYEE_READ,
+  },
+  {
+    title: "Transport",
+    href: "/transport",
+    icon: Bus,
+    permission: PERMISSIONS.TRANSPORT_READ,
   },
   {
     title: "HR Action Center",

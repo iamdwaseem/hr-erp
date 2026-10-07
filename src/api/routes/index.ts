@@ -7,6 +7,7 @@ import { employeesRoutes } from "./employees";
 import { expiryRoutes } from "./expiry";
 import { auditLogsRoutes } from "./audit-logs";
 import { usersRoutes } from "./users";
+import { transportRoutesHandler } from "./transport";
 
 export const apiRouter = new Hono<AppContext>();
 
@@ -17,3 +18,4 @@ apiRouter.route("/employees", employeesRoutes);
 apiRouter.route("/expiry", expiryRoutes);
 apiRouter.route("/audit-logs", auditLogsRoutes);
 apiRouter.route("/users", usersRoutes);
+apiRouter.route("/transport", transportRoutesHandler);

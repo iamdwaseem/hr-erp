@@ -22,6 +22,7 @@ import {
   Globe,
   HeartHandshake,
   PhoneCall,
+  Bus,
 } from "lucide-react";
 import { apiClient } from "../../lib/api-client";
 import { useAuth } from "../../hooks/use-auth";
@@ -33,6 +34,10 @@ import {
   useVisa,
   useWorkPermit,
 } from "../../hooks/use-documents";
+import {
+  useEmployeeCurrentAssignment,
+  useEmployeeAssignmentHistory,
+} from "../../hooks/use-transport";
 import { Button } from "../../components/ui/button";
 import { Badge } from "../../components/ui/badge";
 import { Card, CardHeader, CardTitle, CardContent } from "../../components/ui/card";
@@ -50,7 +55,8 @@ export type ProfileTabType =
   | "passport"
   | "visa"
   | "work_permit"
-  | "documents";
+  | "documents"
+  | "transport";
 
 interface EmployeeProfileProps {
   employeeId: string;
@@ -94,6 +100,10 @@ export const EmployeeProfile: React.FC<EmployeeProfileProps> = ({
   const { data: passport, isLoading: isPassportLoading } = usePassport(effectiveId);
   const { data: visa, isLoading: isVisaLoading } = useVisa(effectiveId);
   const { data: workPermit, isLoading: isWorkPermitLoading } = useWorkPermit(effectiveId);
+
+  // 3. Transport Queries
+  const { data: currentTransport, isLoading: isTransportLoading } = useEmployeeCurrentAssignment(effectiveId);
+  const { data: transportHistory = [], isLoading: isHistoryLoading } = useEmployeeAssignmentHistory(effectiveId);
 
   if (isLoading) {
     return (
@@ -404,6 +414,7 @@ export const EmployeeProfile: React.FC<EmployeeProfileProps> = ({
             { id: "visa", label: "Visa", icon: FileText },
             { id: "work_permit", label: "Work Permit", icon: CreditCard },
             { id: "documents", label: "Documents", icon: FileCheck2 },
+            { id: "transport", label: "Transport", icon: Bus },
           ].map((tab) => {
             const Icon = tab.icon;
             const isActive = activeTab === tab.id;
@@ -497,6 +508,76 @@ export const EmployeeProfile: React.FC<EmployeeProfileProps> = ({
                 <span className="text-muted-foreground">Work Location</span>
                 <span className="font-medium text-foreground">{employee.branch?.name || "Unassigned"}</span>
               </div>
+            </CardContent>
+          </Card>
+
+          {/* Transport summary card */}
+          <Card className="md:col-span-2">
+            <CardHeader className="pb-3 flex flex-row items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Bus className="h-4 w-4 text-primary" />
+                <CardTitle className="text-base font-semibold">Transport & Commute</CardTitle>
+              </div>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="text-xs h-7 px-2"
+                onClick={() => setActiveTab("transport")}
+              >
+                View History & Details →
+              </Button>
+            </CardHeader>
+            <CardContent>
+              {isTransportLoading ? (
+                <div className="py-2 text-xs text-muted-foreground">Loading transport details...</div>
+              ) : currentTransport ? (
+                <dl className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                  <div>
+                    <dt className="text-xs text-muted-foreground uppercase font-medium">Assigned Route</dt>
+                    <dd className="mt-1 font-semibold text-foreground">
+                      {currentTransport.route?.name} ({currentTransport.route?.code})
+                    </dd>
+                  </div>
+                  <div>
+                    <dt className="text-xs text-muted-foreground uppercase font-medium">Pickup Point</dt>
+                    <dd className="mt-1 font-medium text-foreground">
+                      {currentTransport.pickupPoint || "Standard route stop"}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt className="text-xs text-muted-foreground uppercase font-medium">Vehicle / Driver</dt>
+                    <dd className="mt-1 text-foreground">
+                      {currentTransport.vehicle ? (
+                        <span>
+                          {currentTransport.vehicle.registrationNumber}
+                          {currentTransport.vehicle.driverName ? ` (${currentTransport.vehicle.driverName})` : ""}
+                        </span>
+                      ) : (
+                        <span className="text-muted-foreground italic">Flexible / Unassigned</span>
+                      )}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt className="text-xs text-muted-foreground uppercase font-medium">Effective Period</dt>
+                    <dd className="mt-1 font-medium text-foreground">
+                      From {currentTransport.effectiveFrom}
+                      {currentTransport.effectiveTo ? ` to ${currentTransport.effectiveTo}` : " (Ongoing)"}
+                    </dd>
+                  </div>
+                </dl>
+              ) : (
+                <div className="flex items-center justify-between py-1 text-xs text-muted-foreground">
+                  <span>No active transport assignment currently configured for this employee.</span>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-7 text-xs"
+                    onClick={() => setActiveTab("transport")}
+                  >
+                    Configure Transport
+                  </Button>
+                </div>
+              )}
             </CardContent>
           </Card>
         </div>
@@ -925,6 +1006,152 @@ export const EmployeeProfile: React.FC<EmployeeProfileProps> = ({
           employeeId={effectiveId}
           canManage={canEdit}
         />
+      )}
+
+      {/* Tab Contents: Transport */}
+      {activeTab === "transport" && (
+        <div className="space-y-6">
+          {/* Current Active Assignment */}
+          <Card>
+            <CardHeader className="pb-3 border-b flex flex-row items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Bus className="h-4 w-4 text-primary" />
+                <CardTitle className="text-base font-semibold">Active Transport Allocation</CardTitle>
+              </div>
+              {currentTransport && (
+                <Badge variant={currentTransport.status === "active" ? "default" : "secondary"}>
+                  {currentTransport.status.toUpperCase()}
+                </Badge>
+              )}
+            </CardHeader>
+            <CardContent className="pt-4">
+              {isTransportLoading ? (
+                <div className="flex h-24 items-center justify-center">
+                  <Loader2 className="h-5 w-5 animate-spin text-primary" />
+                </div>
+              ) : currentTransport ? (
+                <dl className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6 text-sm">
+                  <div>
+                    <dt className="text-xs text-muted-foreground uppercase font-medium">Route</dt>
+                    <dd className="mt-1 font-semibold text-foreground">
+                      {currentTransport.route?.name}
+                    </dd>
+                    <dd className="text-xs text-muted-foreground font-mono">
+                      {currentTransport.route?.code}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt className="text-xs text-muted-foreground uppercase font-medium">Pickup Point</dt>
+                    <dd className="mt-1 font-medium text-foreground">
+                      {currentTransport.pickupPoint || "Standard pickup location"}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt className="text-xs text-muted-foreground uppercase font-medium">Assigned Vehicle</dt>
+                    <dd className="mt-1 font-semibold text-foreground">
+                      {currentTransport.vehicle ? currentTransport.vehicle.registrationNumber : "Flexible / Unassigned"}
+                    </dd>
+                    {currentTransport.vehicle && (
+                      <dd className="text-xs text-muted-foreground">
+                        {currentTransport.vehicle.vehicleType}
+                      </dd>
+                    )}
+                  </div>
+                  <div>
+                    <dt className="text-xs text-muted-foreground uppercase font-medium">Driver Information</dt>
+                    <dd className="mt-1 font-medium text-foreground">
+                      {currentTransport.vehicle?.driverName || "Driver details pending"}
+                    </dd>
+                    {currentTransport.vehicle?.driverPhone && (
+                      <dd className="text-xs text-muted-foreground">
+                        {currentTransport.vehicle.driverPhone}
+                      </dd>
+                    )}
+                  </div>
+                  <div>
+                    <dt className="text-xs text-muted-foreground uppercase font-medium">Effective Period</dt>
+                    <dd className="mt-1 font-medium text-foreground">
+                      From {currentTransport.effectiveFrom}
+                    </dd>
+                    <dd className="text-xs text-muted-foreground">
+                      {currentTransport.effectiveTo ? `To ${currentTransport.effectiveTo}` : "Ongoing commitment"}
+                    </dd>
+                  </div>
+                  {currentTransport.notes && (
+                    <div className="sm:col-span-2 md:col-span-3">
+                      <dt className="text-xs text-muted-foreground uppercase font-medium">Notes</dt>
+                      <dd className="mt-1 text-xs text-foreground bg-muted/40 p-2 rounded">
+                        {currentTransport.notes}
+                      </dd>
+                    </div>
+                  )}
+                </dl>
+              ) : (
+                <div className="py-6 text-center text-sm text-muted-foreground">
+                  <p>No active transport assignment currently active for this employee.</p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Transport History */}
+          <Card>
+            <CardHeader className="pb-3 border-b">
+              <CardTitle className="text-base font-semibold">Assignment History</CardTitle>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                Complete record of previous and present transport arrangements
+              </p>
+            </CardHeader>
+            <CardContent className="p-0">
+              {isHistoryLoading ? (
+                <div className="flex h-24 items-center justify-center">
+                  <Loader2 className="h-5 w-5 animate-spin text-primary" />
+                </div>
+              ) : transportHistory.length === 0 ? (
+                <div className="py-8 text-center text-sm text-muted-foreground">
+                  No transport history recorded for this employee.
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-sm">
+                    <thead className="border-b bg-muted/40 text-xs text-muted-foreground uppercase">
+                      <tr>
+                        <th className="py-2.5 px-4">Route</th>
+                        <th className="py-2.5 px-4">Vehicle</th>
+                        <th className="py-2.5 px-4">Pickup Point</th>
+                        <th className="py-2.5 px-4">From</th>
+                        <th className="py-2.5 px-4">To</th>
+                        <th className="py-2.5 px-4">Status</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y text-xs">
+                      {transportHistory.map((h) => (
+                        <tr key={h.id} className="hover:bg-muted/30">
+                          <td className="py-2.5 px-4 font-medium text-foreground">
+                            {h.route?.name} <span className="text-muted-foreground">({h.route?.code})</span>
+                          </td>
+                          <td className="py-2.5 px-4 text-muted-foreground">
+                            {h.vehicle ? h.vehicle.registrationNumber : "—"}
+                          </td>
+                          <td className="py-2.5 px-4 text-muted-foreground">
+                            {h.pickupPoint || "—"}
+                          </td>
+                          <td className="py-2.5 px-4 text-foreground">{h.effectiveFrom}</td>
+                          <td className="py-2.5 px-4 text-muted-foreground">{h.effectiveTo || "Ongoing"}</td>
+                          <td className="py-2.5 px-4">
+                            <Badge variant={h.status === "active" ? "default" : "secondary"} className="text-[10px]">
+                              {h.status}
+                            </Badge>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
       )}
 
       {/* Edit Employee Modal */}

@@ -57,6 +57,13 @@
       "when": 1791214000000,
       "tag": "0007_admin_config_and_masters",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "6",
+      "when": 1791403256198,
+      "tag": "0008_transport_management",
+      "breakpoints": true
     }
   ]
 }

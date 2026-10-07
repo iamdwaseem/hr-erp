@@ -21,6 +21,8 @@ export const PERMISSIONS = {
   AUDIT_READ: "audit:read",
   USER_MANAGE: "user:manage",
   MASTER_MANAGE: "master:manage",
+  TRANSPORT_READ: "transport:read",
+  TRANSPORT_MANAGE: "transport:manage",
 } as const;
 
 export type Permission = (typeof PERMISSIONS)[keyof typeof PERMISSIONS];
@@ -37,6 +39,8 @@ export const ROLE_PERMISSIONS: Record<UserRole, readonly Permission[]> = {
     PERMISSIONS.AUDIT_READ,
     PERMISSIONS.USER_MANAGE,
     PERMISSIONS.MASTER_MANAGE,
+    PERMISSIONS.TRANSPORT_READ,
+    PERMISSIONS.TRANSPORT_MANAGE,
   ],
   [ROLES.HR]: [
     PERMISSIONS.EMPLOYEE_READ,
@@ -44,6 +48,8 @@ export const ROLE_PERMISSIONS: Record<UserRole, readonly Permission[]> = {
     PERMISSIONS.EMPLOYEE_UPDATE,
     PERMISSIONS.DOCUMENT_READ,
     PERMISSIONS.DOCUMENT_UPLOAD,
+    PERMISSIONS.TRANSPORT_READ,
+    PERMISSIONS.TRANSPORT_MANAGE,
   ],
 };
 
