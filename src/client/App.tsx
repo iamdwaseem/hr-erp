@@ -11,6 +11,10 @@ import { AuditLogPage } from "./pages/audit-log";
 import { UsersPage } from "./pages/settings/users-page";
 import { MastersPage } from "./pages/settings/masters-page";
 import { TransportPage } from "./pages/transport";
+import { SalaryPage } from "./pages/salary";
+import { PayrollPage } from "./pages/payroll";
+import { GratuityPage } from "./pages/gratuity";
+import { PayslipsPage } from "./pages/payslips";
 import { NotFoundPage } from "./pages/not-found";
 import { AppLayout } from "./components/layout/app-layout";
 import { ProtectedRoute } from "./components/layout/protected-route";
@@ -76,6 +80,42 @@ const AppContent: React.FC = () => {
           component: (
             <ProtectedRoute requiredPermission={PERMISSIONS.EMPLOYEE_READ}>
               <EmployeesPage />
+            </ProtectedRoute>
+          ),
+        };
+      case "/salary":
+        return {
+          title: "Salary & Compensation",
+          component: (
+            <ProtectedRoute requiredPermission={PERMISSIONS.SALARY_READ}>
+              <SalaryPage onViewEmployee={handleViewEmployee} />
+            </ProtectedRoute>
+          ),
+        };
+      case "/payroll":
+        return {
+          title: "Payroll Runs & Processing",
+          component: (
+            <ProtectedRoute requiredPermission={PERMISSIONS.PAYROLL_READ}>
+              <PayrollPage onViewEmployee={handleViewEmployee} />
+            </ProtectedRoute>
+          ),
+        };
+      case "/payslips":
+        return {
+          title: "Payslips Archive",
+          component: (
+            <ProtectedRoute requiredPermission={PERMISSIONS.PAYSLIP_READ}>
+              <PayslipsPage onViewEmployee={handleViewEmployee} />
+            </ProtectedRoute>
+          ),
+        };
+      case "/gratuity":
+        return {
+          title: "Gratuity Settlements",
+          component: (
+            <ProtectedRoute requiredPermission={PERMISSIONS.GRATUITY_READ}>
+              <GratuityPage onViewEmployee={handleViewEmployee} />
             </ProtectedRoute>
           ),
         };

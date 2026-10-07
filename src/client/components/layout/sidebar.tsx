@@ -9,6 +9,10 @@ import {
   UserCog,
   Database,
   Bus,
+  Wallet,
+  CreditCard,
+  Calculator,
+  FileText,
 } from "lucide-react";
 import { useAuth } from "../../hooks/use-auth";
 import { cn } from "../../lib/utils";
@@ -35,6 +39,30 @@ const navItems: NavItem[] = [
     href: "/employees",
     icon: Users,
     permission: PERMISSIONS.EMPLOYEE_READ,
+  },
+  {
+    title: "Salary & Compensation",
+    href: "/salary",
+    icon: Wallet,
+    permission: PERMISSIONS.SALARY_READ,
+  },
+  {
+    title: "Payroll Runs",
+    href: "/payroll",
+    icon: CreditCard,
+    permission: PERMISSIONS.PAYROLL_READ,
+  },
+  {
+    title: "Payslips",
+    href: "/payslips",
+    icon: FileText,
+    permission: PERMISSIONS.PAYSLIP_READ,
+  },
+  {
+    title: "Gratuity Settlements",
+    href: "/gratuity",
+    icon: Calculator,
+    permission: PERMISSIONS.GRATUITY_READ,
   },
   {
     title: "Transport",

@@ -24,6 +24,7 @@ import {
   PhoneCall,
   Bus,
   Trash2,
+  Wallet,
 } from "lucide-react";
 import { apiClient } from "../../lib/api-client";
 import { useAuth } from "../../hooks/use-auth";
@@ -47,6 +48,7 @@ import { PassportDialog } from "./passport-dialog";
 import { VisaDialog } from "./visa-dialog";
 import { WorkPermitDialog } from "./work-permit-dialog";
 import { DocumentVaultTab } from "./document-vault-tab";
+import { EmployeeSalaryTab } from "./employee-salary-tab";
 
 export type ProfileTabType =
   | "overview"
@@ -57,7 +59,8 @@ export type ProfileTabType =
   | "visa"
   | "work_permit"
   | "documents"
-  | "transport";
+  | "transport"
+  | "salary";
 
 interface EmployeeProfileProps {
   employeeId: string;
@@ -449,6 +452,7 @@ export const EmployeeProfile: React.FC<EmployeeProfileProps> = ({
             { id: "work_permit", label: "Work Permit", icon: CreditCard },
             { id: "documents", label: "Documents", icon: FileCheck2 },
             { id: "transport", label: "Transport", icon: Bus },
+            { id: "salary", label: "Salary & Payroll", icon: Wallet },
           ].map((tab) => {
             const Icon = tab.icon;
             const isActive = activeTab === tab.id;
@@ -1186,6 +1190,16 @@ export const EmployeeProfile: React.FC<EmployeeProfileProps> = ({
             </CardContent>
           </Card>
         </div>
+      )}
+
+      {/* Tab Contents: Salary & Compensation */}
+      {activeTab === "salary" && (
+        <EmployeeSalaryTab
+          employeeId={effectiveId}
+          employeeName={employee.fullName}
+          employeeCode={employee.employeeCode}
+          canEdit={canEdit}
+        />
       )}
 
       {/* Edit Employee Modal */}
