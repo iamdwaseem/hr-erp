@@ -6,6 +6,7 @@ import { requireRole } from "../middleware/rbac";
 import { ROLES } from "../../shared/constants/roles";
 import { getDb } from "../db/client";
 import { employees } from "../db/schema/employees";
+import { employeeDocuments } from "../db/schema/documents";
 import { departments, designations, branches } from "../db/schema/masters";
 import { auditLogs } from "../db/schema/audit";
 import {
@@ -638,3 +639,82 @@ employeesRoutes.put("/:id", requireRole(ROLES.ADMIN, ROLES.HR), async (c) => {
     );
   }
 });
+
+/**
+ * DELETE /api/employees/:id
+ * ADMIN-only hard delete. Permanently removes the employee and all dependent records.
+ * Passports, visas, work permits, transport assignments cascade-delete via FK.
+ * Employee documents in D1 are deleted; R2 objects are deleted individually.
+ */
+employeesRoutes.delete("/:id", requireRole(ROLES.ADMIN), async (c) => {
+  const user = c.get("user")!;
+  const id = c.req.param("id");
+  const db = getDb(c.env.DB);
+
+  try {
+    const existing = await db
+      .select()
+      .from(employees)
+      .where(eq(employees.id, id))
+      .limit(1);
+
+    if (!existing.length) {
+      return jsonError(c, "NOT_FOUND", "Employee not found", 404);
+    }
+
+    const emp = existing[0];
+
+    // 1. Collect and delete all R2-backed documents for this employee
+    const docs = await db
+      .select({ id: employeeDocuments.id, r2Key: employeeDocuments.r2Key })
+      .from(employeeDocuments)
+      .where(eq(employeeDocuments.employeeId, id));
+
+    for (const doc of docs) {
+      if (doc.r2Key) {
+        await c.env.BUCKET.delete(doc.r2Key).catch(() => {});
+      }
+    }
+
+    // 2. Delete the employee record (FK cascade removes passports, visas,
+    //    work permits, employee_documents, transport assignments)
+    await db.delete(employees).where(eq(employees.id, id));
+
+    // 3. Audit log
+    try {
+      const now = new Date().toISOString();
+      await db.insert(auditLogs).values({
+        id: crypto.randomUUID(),
+        userId: user.sub,
+        action: "EMPLOYEE_HARD_DELETE",
+        resourceType: "employee",
+        resourceId: id,
+        details: JSON.stringify({
+          employeeCode: emp.employeeCode,
+          employeeId: emp.employeeId,
+          fullName: emp.fullName,
+          r2DocumentsDeleted: docs.length,
+        }),
+        ipAddress: c.req.header("cf-connecting-ip") || "127.0.0.1",
+        userAgent: c.req.header("user-agent") || "unknown",
+        createdAt: now,
+      });
+    } catch {
+      // Non-blocking
+    }
+
+    return jsonSuccess(c, {
+      deleted: true,
+      message: `Employee "${emp.fullName}" permanently deleted`,
+      id,
+    });
+  } catch (err) {
+    return jsonError(
+      c,
+      "DB_ERROR",
+      err instanceof Error ? err.message : "Failed to delete employee",
+      500
+    );
+  }
+});
+

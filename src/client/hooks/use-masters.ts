@@ -225,3 +225,49 @@ export function useActivateDocumentType() {
     },
   });
 }
+
+// Hard Delete Mutations
+export function useDeleteDepartment() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) =>
+      apiClient.delete<{ deleted: boolean; message: string; id: string }>(`/masters/departments/${id}`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["masters", "departments"] });
+    },
+  });
+}
+
+export function useDeleteDesignation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) =>
+      apiClient.delete<{ deleted: boolean; message: string; id: string }>(`/masters/designations/${id}`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["masters", "designations"] });
+    },
+  });
+}
+
+export function useDeleteBranch() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) =>
+      apiClient.delete<{ deleted: boolean; message: string; id: string }>(`/masters/branches/${id}`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["masters", "branches"] });
+    },
+  });
+}
+
+export function useDeleteDocumentType() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) =>
+      apiClient.delete<{ deleted: boolean; message: string; id: string }>(`/masters/document-types/${id}`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["masters", "document-types"] });
+    },
+  });
+}
+

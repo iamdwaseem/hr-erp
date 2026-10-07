@@ -12,6 +12,7 @@ import {
   CheckCircle2,
   X,
   Lock,
+  Trash2,
 } from "lucide-react";
 import {
   useUsers,
@@ -20,6 +21,7 @@ import {
   useResetPassword,
   useDisableUser,
   useEnableUser,
+  useDeleteUser,
 } from "../../hooks/use-users";
 import { Button } from "../../components/ui/button";
 import { Input } from "../../components/ui/input";
@@ -33,6 +35,7 @@ export const UsersPage: React.FC = () => {
   const resetPassword = useResetPassword();
   const disableUser = useDisableUser();
   const enableUser = useEnableUser();
+  const deleteUser = useDeleteUser();
 
   // Dialog states
   const [isCreateOpen, setIsCreateOpen] = useState(false);
@@ -165,6 +168,26 @@ export const UsersPage: React.FC = () => {
       setTimeout(() => setFormSuccess(null), 4000);
     } catch (err: any) {
       alert(err.message || "Failed to update user status");
+    }
+  };
+
+  const handleDeleteUser = async (user: SafeUser) => {
+    if (user.role === ROLES.ADMIN) {
+      alert("The System Administrator account cannot be deleted.");
+      return;
+    }
+
+    const confirmed = window.confirm(
+      `PERMANENT DELETE WARNING:\n\nAre you sure you want to permanently delete HR user account "${user.fullName}" (${user.email})?\n\nThis account will be permanently removed from the system. This action CANNOT be undone.`
+    );
+    if (!confirmed) return;
+
+    try {
+      await deleteUser.mutateAsync(user.id);
+      setFormSuccess(`User ${user.fullName} permanently deleted.`);
+      setTimeout(() => setFormSuccess(null), 4000);
+    } catch (err: any) {
+      alert(err.message || "Failed to delete user");
     }
   };
 
@@ -313,15 +336,26 @@ export const UsersPage: React.FC = () => {
                             <KeyRound className="h-4 w-4" />
                           </Button>
                           {!isAdmin && (
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => handleToggleActive(u)}
-                              title={u.isActive ? "Disable account" : "Enable account"}
-                              className={u.isActive ? "text-amber-600 hover:text-amber-700" : "text-emerald-600 hover:text-emerald-700"}
-                            >
-                              {u.isActive ? <UserX className="h-4 w-4" /> : <UserCheck className="h-4 w-4" />}
-                            </Button>
+                            <>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleToggleActive(u)}
+                                title={u.isActive ? "Disable account" : "Enable account"}
+                                className={u.isActive ? "text-amber-600 hover:text-amber-700" : "text-emerald-600 hover:text-emerald-700"}
+                              >
+                                {u.isActive ? <UserX className="h-4 w-4" /> : <UserCheck className="h-4 w-4" />}
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleDeleteUser(u)}
+                                title="Hard Delete Account"
+                                className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </>
                           )}
                         </div>
                       </td>

@@ -633,3 +633,100 @@ mastersRoutes.post("/document-types/:id/activate", requireRole(ROLES.ADMIN), asy
     return jsonError(c, "DB_ERROR", err instanceof Error ? err.message : "Failed to activate document type", 500);
   }
 });
+
+// ==========================================
+// ADMIN HARD DELETE — MASTER RECORDS
+// ==========================================
+
+/**
+ * DELETE /api/masters/departments/:id
+ * ADMIN-only hard delete of a department record.
+ */
+mastersRoutes.delete("/departments/:id", requireRole(ROLES.ADMIN), async (c) => {
+  const id = c.req.param("id");
+  const db = getDb(c.env.DB);
+  try {
+    const existing = await db.select().from(departments).where(eq(departments.id, id)).limit(1);
+    if (!existing[0]) return jsonError(c, "NOT_FOUND", "Department not found", 404);
+
+    await db.delete(departments).where(eq(departments.id, id));
+    await logMasterAudit(c, "DEPARTMENT_HARD_DELETED", "departments", id, {
+      name: existing[0].name,
+      code: existing[0].code,
+    });
+
+    return jsonSuccess(c, { deleted: true, message: `Department "${existing[0].name}" permanently deleted`, id });
+  } catch (err) {
+    return jsonError(c, "DB_ERROR", err instanceof Error ? err.message : "Failed to delete department", 500);
+  }
+});
+
+/**
+ * DELETE /api/masters/designations/:id
+ * ADMIN-only hard delete of a designation record.
+ */
+mastersRoutes.delete("/designations/:id", requireRole(ROLES.ADMIN), async (c) => {
+  const id = c.req.param("id");
+  const db = getDb(c.env.DB);
+  try {
+    const existing = await db.select().from(designations).where(eq(designations.id, id)).limit(1);
+    if (!existing[0]) return jsonError(c, "NOT_FOUND", "Designation not found", 404);
+
+    await db.delete(designations).where(eq(designations.id, id));
+    await logMasterAudit(c, "DESIGNATION_HARD_DELETED", "designations", id, {
+      name: existing[0].name,
+      code: existing[0].code,
+    });
+
+    return jsonSuccess(c, { deleted: true, message: `Designation "${existing[0].name}" permanently deleted`, id });
+  } catch (err) {
+    return jsonError(c, "DB_ERROR", err instanceof Error ? err.message : "Failed to delete designation", 500);
+  }
+});
+
+/**
+ * DELETE /api/masters/branches/:id
+ * ADMIN-only hard delete of a branch record.
+ */
+mastersRoutes.delete("/branches/:id", requireRole(ROLES.ADMIN), async (c) => {
+  const id = c.req.param("id");
+  const db = getDb(c.env.DB);
+  try {
+    const existing = await db.select().from(branches).where(eq(branches.id, id)).limit(1);
+    if (!existing[0]) return jsonError(c, "NOT_FOUND", "Branch not found", 404);
+
+    await db.delete(branches).where(eq(branches.id, id));
+    await logMasterAudit(c, "BRANCH_HARD_DELETED", "branches", id, {
+      name: existing[0].name,
+      code: existing[0].code,
+    });
+
+    return jsonSuccess(c, { deleted: true, message: `Branch "${existing[0].name}" permanently deleted`, id });
+  } catch (err) {
+    return jsonError(c, "DB_ERROR", err instanceof Error ? err.message : "Failed to delete branch", 500);
+  }
+});
+
+/**
+ * DELETE /api/masters/document-types/:id
+ * ADMIN-only hard delete of a document type record.
+ */
+mastersRoutes.delete("/document-types/:id", requireRole(ROLES.ADMIN), async (c) => {
+  const id = c.req.param("id");
+  const db = getDb(c.env.DB);
+  try {
+    const existing = await db.select().from(documentTypes).where(eq(documentTypes.id, id)).limit(1);
+    if (!existing[0]) return jsonError(c, "NOT_FOUND", "Document type not found", 404);
+
+    await db.delete(documentTypes).where(eq(documentTypes.id, id));
+    await logMasterAudit(c, "DOCUMENT_TYPE_HARD_DELETED", "document_types", id, {
+      name: existing[0].name,
+      code: existing[0].code,
+    });
+
+    return jsonSuccess(c, { deleted: true, message: `Document type "${existing[0].name}" permanently deleted`, id });
+  } catch (err) {
+    return jsonError(c, "DB_ERROR", err instanceof Error ? err.message : "Failed to delete document type", 500);
+  }
+});
+

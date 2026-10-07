@@ -12,6 +12,7 @@ import {
 } from "../db/schema/transport";
 import { branches } from "../db/schema/masters";
 import { employees } from "../db/schema/employees";
+import { users } from "../db/schema/users";
 import { auditLogs } from "../db/schema/audit";
 import { jsonSuccess, jsonError } from "../utils/response";
 import {
@@ -41,9 +42,14 @@ async function logTransportAudit(
   try {
     const user = c.get("user");
     const db = getDb(c.env.DB);
+    let validUserId: string | null = null;
+    if (user?.sub) {
+      const u = await db.select({ id: users.id }).from(users).where(eq(users.id, user.sub)).limit(1);
+      if (u.length > 0) validUserId = user.sub;
+    }
     await db.insert(auditLogs).values({
       id: crypto.randomUUID(),
-      userId: user?.sub,
+      userId: validUserId,
       action,
       resourceType,
       resourceId,
@@ -432,11 +438,26 @@ transportRoutesHandler.post("/routes/:id/deactivate", async (c) => {
   }
 });
 
-// Safe delete: reject if historical or active assignments exist
+// Delete route:
+// - HR: blocked if any assignments exist (historical or active)
+// - ADMIN: force-deletes the route AND all its assignments regardless
 transportRoutesHandler.delete("/routes/:id", async (c) => {
   try {
     const id = c.req.param("id");
+    const user = c.get("user")!;
     const db = getDb(c.env.DB);
+
+    const existing = await db
+      .select()
+      .from(transportRoutes)
+      .where(eq(transportRoutes.id, id))
+      .limit(1);
+
+    if (existing.length === 0) {
+      return jsonError(c, "NOT_FOUND", "Route not found", 404);
+    }
+
+    const isAdmin = user.role === ROLES.ADMIN;
 
     const assignmentCountResult = await db
       .select({ count: sql<number>`count(*)` })
@@ -444,7 +465,8 @@ transportRoutesHandler.delete("/routes/:id", async (c) => {
       .where(eq(employeeTransportAssignments.routeId, id));
 
     const assignmentCount = Number(assignmentCountResult[0]?.count ?? 0);
-    if (assignmentCount > 0) {
+
+    if (assignmentCount > 0 && !isAdmin) {
       return jsonError(
         c,
         "ROUTE_HAS_ASSIGNMENTS",
@@ -453,10 +475,26 @@ transportRoutesHandler.delete("/routes/:id", async (c) => {
       );
     }
 
-    await db.delete(transportRoutes).where(eq(transportRoutes.id, id));
-    await logTransportAudit(c, "transport:route:deleted", "transport_route", id);
+    // Admin: cascade-delete assignments first, then route
+    if (assignmentCount > 0 && isAdmin) {
+      await db
+        .delete(employeeTransportAssignments)
+        .where(eq(employeeTransportAssignments.routeId, id));
+    }
 
-    return jsonSuccess(c, { message: "Route deleted successfully", id });
+    await db.delete(transportRoutes).where(eq(transportRoutes.id, id));
+    await logTransportAudit(c, isAdmin ? "transport:route:hard_deleted" : "transport:route:deleted", "transport_route", id, {
+      name: existing[0].name,
+      code: existing[0].code,
+      assignmentsPurged: isAdmin ? assignmentCount : 0,
+    });
+
+    return jsonSuccess(c, {
+      message: isAdmin && assignmentCount > 0
+        ? `Route deleted along with ${assignmentCount} assignment(s)`
+        : "Route deleted successfully",
+      id,
+    });
   } catch (error: any) {
     return jsonError(c, "INTERNAL_ERROR", error.message || "Failed to delete route", 500);
   }
@@ -734,11 +772,26 @@ transportRoutesHandler.post("/vehicles/:id/deactivate", async (c) => {
   }
 });
 
-// Safe delete: reject if historical or active assignments exist
+// Delete vehicle:
+// - HR: blocked if any assignments exist (historical or active)
+// - ADMIN: force-deletes the vehicle AND nullifies vehicle reference in assignments
 transportRoutesHandler.delete("/vehicles/:id", async (c) => {
   try {
     const id = c.req.param("id");
+    const user = c.get("user")!;
     const db = getDb(c.env.DB);
+
+    const existing = await db
+      .select()
+      .from(transportVehicles)
+      .where(eq(transportVehicles.id, id))
+      .limit(1);
+
+    if (existing.length === 0) {
+      return jsonError(c, "NOT_FOUND", "Vehicle not found", 404);
+    }
+
+    const isAdmin = user.role === ROLES.ADMIN;
 
     const assignmentCountResult = await db
       .select({ count: sql<number>`count(*)` })
@@ -746,7 +799,8 @@ transportRoutesHandler.delete("/vehicles/:id", async (c) => {
       .where(eq(employeeTransportAssignments.vehicleId, id));
 
     const assignmentCount = Number(assignmentCountResult[0]?.count ?? 0);
-    if (assignmentCount > 0) {
+
+    if (assignmentCount > 0 && !isAdmin) {
       return jsonError(
         c,
         "VEHICLE_HAS_ASSIGNMENTS",
@@ -755,10 +809,26 @@ transportRoutesHandler.delete("/vehicles/:id", async (c) => {
       );
     }
 
-    await db.delete(transportVehicles).where(eq(transportVehicles.id, id));
-    await logTransportAudit(c, "transport:vehicle:deleted", "transport_vehicle", id);
+    // Admin: nullify vehicle reference in assignments so assignments are preserved
+    if (assignmentCount > 0 && isAdmin) {
+      await db
+        .update(employeeTransportAssignments)
+        .set({ vehicleId: null, updatedAt: new Date().toISOString() })
+        .where(eq(employeeTransportAssignments.vehicleId, id));
+    }
 
-    return jsonSuccess(c, { message: "Vehicle deleted successfully", id });
+    await db.delete(transportVehicles).where(eq(transportVehicles.id, id));
+    await logTransportAudit(c, isAdmin ? "transport:vehicle:hard_deleted" : "transport:vehicle:deleted", "transport_vehicle", id, {
+      registrationNumber: existing[0].registrationNumber,
+      assignmentsUpdated: isAdmin ? assignmentCount : 0,
+    });
+
+    return jsonSuccess(c, {
+      message: isAdmin && assignmentCount > 0
+        ? `Vehicle deleted; ${assignmentCount} assignment(s) had their vehicle reference cleared`
+        : "Vehicle deleted successfully",
+      id,
+    });
   } catch (error: any) {
     return jsonError(c, "INTERNAL_ERROR", error.message || "Failed to delete vehicle", 500);
   }
@@ -1422,3 +1492,50 @@ transportRoutesHandler.post("/assignments/:id/end", async (c) => {
     return jsonError(c, "INTERNAL_ERROR", error.message || "Failed to end assignment", 500);
   }
 });
+
+// ==========================================
+// 5. ADMIN HARD DELETE — ASSIGNMENTS
+// ==========================================
+
+/**
+ * DELETE /api/transport/assignments/:id
+ * ADMIN-only: permanently remove a single transport assignment record.
+ */
+transportRoutesHandler.delete("/assignments/:id", requireRole(ROLES.ADMIN), async (c) => {
+  try {
+    const id = c.req.param("id");
+    const db = getDb(c.env.DB);
+
+    const existing = await db
+      .select()
+      .from(employeeTransportAssignments)
+      .where(eq(employeeTransportAssignments.id, id))
+      .limit(1);
+
+    if (existing.length === 0) {
+      return jsonError(c, "NOT_FOUND", "Assignment not found", 404);
+    }
+
+    const assignment = existing[0];
+
+    await db
+      .delete(employeeTransportAssignments)
+      .where(eq(employeeTransportAssignments.id, id));
+
+    await logTransportAudit(c, "transport:assignment:hard_deleted", "transport_assignment", id, {
+      employeeId: assignment.employeeId,
+      routeId: assignment.routeId,
+      vehicleId: assignment.vehicleId,
+      status: assignment.status,
+    });
+
+    return jsonSuccess(c, {
+      deleted: true,
+      message: "Assignment permanently deleted",
+      id,
+    });
+  } catch (error: any) {
+    return jsonError(c, "INTERNAL_ERROR", error.message || "Failed to delete assignment", 500);
+  }
+});
+

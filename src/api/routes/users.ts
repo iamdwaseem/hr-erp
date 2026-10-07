@@ -499,3 +499,69 @@ usersRoutes.post("/:id/enable", async (c) => {
     );
   }
 });
+
+/**
+ * DELETE /api/users/:id
+ * ADMIN-only: permanently delete an HR user account.
+ * The ADMIN account itself cannot be deleted.
+ */
+usersRoutes.delete("/:id", async (c) => {
+  const id = c.req.param("id");
+  const adminUser = c.get("user")!;
+  const db = getDb(c.env.DB);
+
+  try {
+    const existingUsers = await db.select().from(users).where(eq(users.id, id)).limit(1);
+    const targetUser = existingUsers[0];
+    if (!targetUser) {
+      return jsonError(c, "NOT_FOUND", "User not found", 404);
+    }
+
+    if (targetUser.role === ROLES.ADMIN) {
+      return jsonError(
+        c,
+        "CANNOT_DELETE_ADMIN",
+        "The System Administrator account cannot be deleted",
+        400
+      );
+    }
+
+    await db.delete(users).where(eq(users.id, id));
+
+    // Record audit log
+    try {
+      const now = new Date().toISOString();
+      await db.insert(auditLogs).values({
+        id: crypto.randomUUID(),
+        userId: adminUser.sub,
+        action: "USER_HARD_DELETED",
+        resourceType: "users",
+        resourceId: id,
+        details: JSON.stringify({
+          deletedEmail: targetUser.email,
+          deletedFullName: targetUser.fullName,
+          deletedRole: targetUser.role,
+        }),
+        ipAddress: c.req.header("cf-connecting-ip") || "127.0.0.1",
+        userAgent: c.req.header("user-agent") || "unknown",
+        createdAt: now,
+      });
+    } catch {
+      // Non-blocking
+    }
+
+    return jsonSuccess(c, {
+      deleted: true,
+      message: `User "${targetUser.fullName}" permanently deleted`,
+      id,
+    });
+  } catch (err) {
+    return jsonError(
+      c,
+      "DB_ERROR",
+      err instanceof Error ? err.message : "Failed to delete user",
+      500
+    );
+  }
+});
+

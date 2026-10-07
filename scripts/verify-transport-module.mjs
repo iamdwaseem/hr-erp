@@ -453,24 +453,24 @@ async function runTests() {
   // ----------------------------------------------------
   console.log("\n--- Section 5: Safety & Deletion Protections ---");
 
-  // 32. Attempting to delete a route with assignments is rejected
+  // 32. Attempting to delete a route with assignments as HR is rejected
   const deleteRouteRes = await request(`/transport/routes/${createdRoute.id}`, {
     method: "DELETE",
-    headers: adminHeaders,
+    headers: hrHeaders,
   });
   assert(
     deleteRouteRes.status === 400 && deleteRouteRes.data?.error?.code === "ROUTE_HAS_ASSIGNMENTS",
-    "32. Integrity: Deleting route with existing assignments rejected with ROUTE_HAS_ASSIGNMENTS"
+    "32. Integrity: Deleting route with existing assignments rejected for HR with ROUTE_HAS_ASSIGNMENTS"
   );
 
-  // 33. Attempting to delete a vehicle with assignments is rejected
+  // 33. Attempting to delete a vehicle with assignments as HR is rejected
   const deleteVehRes = await request(`/transport/vehicles/${createdVehicle.id}`, {
     method: "DELETE",
-    headers: adminHeaders,
+    headers: hrHeaders,
   });
   assert(
     deleteVehRes.status === 400 && deleteVehRes.data?.error?.code === "VEHICLE_HAS_ASSIGNMENTS",
-    "33. Integrity: Deleting vehicle with existing assignments rejected with VEHICLE_HAS_ASSIGNMENTS"
+    "33. Integrity: Deleting vehicle with existing assignments rejected for HR with VEHICLE_HAS_ASSIGNMENTS"
   );
 
   // ----------------------------------------------------
@@ -491,8 +491,10 @@ async function runTests() {
   );
 
   // 35. Audit logs contain transport entries (Admin only)
-  const auditRes = await request("/audit-logs", { headers: adminHeaders });
-  const logs = auditRes.data?.data?.items || auditRes.data?.data || [];
+  const auditRes = await request("/audit-logs?search=transport&limit=100", { headers: adminHeaders });
+  const logs = Array.isArray(auditRes.data?.data)
+    ? auditRes.data.data
+    : auditRes.data?.data?.items || [];
   const hasRouteAudit = logs.some((l) => l.action?.includes("transport:route"));
   const hasVehicleAudit = logs.some((l) => l.action?.includes("transport:vehicle"));
   const hasAssignAudit = logs.some((l) => l.action?.includes("transport:assignment"));

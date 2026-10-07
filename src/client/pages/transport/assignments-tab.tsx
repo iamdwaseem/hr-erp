@@ -9,11 +9,15 @@ import {
   Calendar,
   StopCircle,
   Edit,
+  Trash2,
 } from "lucide-react";
 import {
   useTransportAssignments,
   useTransportRoutes,
+  useDeleteAssignment,
 } from "../../hooks/use-transport";
+import { useAuth } from "../../hooks/use-auth";
+import { ROLES } from "../../../shared/constants/roles";
 import { Button } from "../../components/ui/button";
 import { Input } from "../../components/ui/input";
 import { Select } from "../../components/ui/select";
@@ -34,6 +38,10 @@ export const AssignmentsTab: React.FC<AssignmentsTabProps> = ({
   onEndAssignment,
   onViewEmployee,
 }) => {
+  const { hasRole } = useAuth();
+  const isAdmin = hasRole(ROLES.ADMIN);
+  const deleteAssignment = useDeleteAssignment();
+
   const [searchInput, setSearchInput] = useState("");
   const [statusFilter, setStatusFilter] = useState("active");
   const [routeFilter, setRouteFilter] = useState("");
@@ -45,6 +53,19 @@ export const AssignmentsTab: React.FC<AssignmentsTabProps> = ({
     status: statusFilter !== "all" ? statusFilter : undefined,
     routeId: routeFilter || undefined,
   });
+
+  const handleDeleteAssignment = async (a: TransportAssignment) => {
+    const confirmed = window.confirm(
+      `PERMANENT DELETE WARNING:\n\nAre you sure you want to permanently delete this transport assignment for employee "${a.employee?.fullName || a.employeeId}" on route "${a.route?.name || a.routeId}"?\n\nThis action CANNOT be undone.`
+    );
+    if (!confirmed) return;
+
+    try {
+      await deleteAssignment.mutateAsync(a.id);
+    } catch (err: any) {
+      alert(err.message || "Failed to delete assignment");
+    }
+  };
 
   return (
     <div className="space-y-4">
@@ -211,6 +232,17 @@ export const AssignmentsTab: React.FC<AssignmentsTabProps> = ({
                                 onClick={() => onEndAssignment(a)}
                               >
                                 <StopCircle className="h-3.5 w-3.5 mr-1" /> End
+                              </Button>
+                            )}
+                            {isAdmin && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-8 px-2 text-xs text-destructive hover:bg-destructive/10"
+                                onClick={() => handleDeleteAssignment(a)}
+                                title="Hard Delete Assignment"
+                              >
+                                <Trash2 className="h-3.5 w-3.5" />
                               </Button>
                             )}
                           </div>

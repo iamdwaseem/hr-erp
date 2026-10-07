@@ -14,6 +14,7 @@ import {
   AlertCircle,
   X,
   Search,
+  Trash2,
 } from "lucide-react";
 import {
   useDepartments,
@@ -21,21 +22,25 @@ import {
   useUpdateDepartment,
   useActivateDepartment,
   useDeactivateDepartment,
+  useDeleteDepartment,
   useDesignations,
   useCreateDesignation,
   useUpdateDesignation,
   useActivateDesignation,
   useDeactivateDesignation,
+  useDeleteDesignation,
   useBranches,
   useCreateBranch,
   useUpdateBranch,
   useActivateBranch,
   useDeactivateBranch,
+  useDeleteBranch,
   useDocumentTypes,
   useCreateDocumentType,
   useUpdateDocumentType,
   useActivateDocumentType,
   useDeactivateDocumentType,
+  useDeleteDocumentType,
 } from "../../hooks/use-masters";
 import { Button } from "../../components/ui/button";
 import { Input } from "../../components/ui/input";
@@ -58,24 +63,28 @@ export const MastersPage: React.FC = () => {
   const updateDept = useUpdateDepartment();
   const activateDept = useActivateDepartment();
   const deactivateDept = useDeactivateDepartment();
+  const deleteDept = useDeleteDepartment();
 
   // Designation Mutations
   const createDesig = useCreateDesignation();
   const updateDesig = useUpdateDesignation();
   const activateDesig = useActivateDesignation();
   const deactivateDesig = useDeactivateDesignation();
+  const deleteDesig = useDeleteDesignation();
 
   // Branch Mutations
   const createBranch = useCreateBranch();
   const updateBranch = useUpdateBranch();
   const activateBranch = useActivateBranch();
   const deactivateBranch = useDeactivateBranch();
+  const deleteBranch = useDeleteBranch();
 
   // Document Type Mutations
   const createDocType = useCreateDocumentType();
   const updateDocType = useUpdateDocumentType();
   const activateDocType = useActivateDocumentType();
   const deactivateDocType = useDeactivateDocumentType();
+  const deleteDocType = useDeleteDocumentType();
 
   // Dialog state
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -204,6 +213,32 @@ export const MastersPage: React.FC = () => {
       showSuccess(`${item.name} has been ${isCurrentlyActive ? "deactivated" : "activated"}.`);
     } catch (err: any) {
       alert(err.message || "Failed to update status");
+    }
+  };
+
+  const handleDeleteItem = async (item: any) => {
+    const typeLabel =
+      activeTab === "departments"
+        ? "department"
+        : activeTab === "designations"
+        ? "designation"
+        : activeTab === "branches"
+        ? "branch"
+        : "document type";
+
+    const confirmed = window.confirm(
+      `PERMANENT DELETE WARNING:\n\nAre you sure you want to permanently delete ${typeLabel} "${item.name}" (${item.code})?\n\nThis record will be permanently deleted. This action CANNOT be undone.`
+    );
+    if (!confirmed) return;
+
+    try {
+      if (activeTab === "departments") await deleteDept.mutateAsync(item.id);
+      else if (activeTab === "designations") await deleteDesig.mutateAsync(item.id);
+      else if (activeTab === "branches") await deleteBranch.mutateAsync(item.id);
+      else if (activeTab === "document-types") await deleteDocType.mutateAsync(item.id);
+      showSuccess(`${item.name} has been permanently deleted.`);
+    } catch (err: any) {
+      alert(err.message || "Failed to delete record");
     }
   };
 
@@ -389,6 +424,15 @@ export const MastersPage: React.FC = () => {
                             className={isActive ? "text-amber-600 hover:text-amber-700" : "text-emerald-600 hover:text-emerald-700"}
                           >
                             {isActive ? <XCircle className="h-4 w-4" /> : <CheckCircle className="h-4 w-4" />}
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleDeleteItem(item)}
+                            title="Hard Delete"
+                            className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                          >
+                            <Trash2 className="h-4 w-4" />
                           </Button>
                         </div>
                       </td>

@@ -8,6 +8,7 @@ import {
   ChevronRight,
   Eye,
   Edit,
+  Trash2,
   Loader2,
   Users,
   AlertCircle,
@@ -35,6 +36,7 @@ interface EmployeeListProps {
 export const EmployeeList: React.FC<EmployeeListProps> = ({ onSelectEmployee }) => {
   const { hasRole } = useAuth();
   const canCreateOrEdit = hasRole([ROLES.ADMIN, ROLES.HR]);
+  const isAdmin = hasRole(ROLES.ADMIN);
 
   // Filters state
   const [page, setPage] = useState<number>(1);
@@ -108,6 +110,20 @@ export const EmployeeList: React.FC<EmployeeListProps> = ({ onSelectEmployee }) 
   const hasActiveFilters = Boolean(
     search || departmentId || designationId || branchId || employmentStatus || nationality
   );
+
+  const handleDeleteEmployee = async (emp: EmployeeListItem) => {
+    const confirmed = window.confirm(
+      `PERMANENT DELETE WARNING:\n\nAre you sure you want to permanently delete employee "${emp.fullName}" (${emp.employeeCode})?\n\nThis will permanently delete all associated documents, passports, visas, work permits, and transport assignments. This action CANNOT be undone.`
+    );
+    if (!confirmed) return;
+
+    try {
+      await apiClient.delete(`/employees/${emp.id}`);
+      refetch();
+    } catch (err: any) {
+      alert(err.message || "Failed to delete employee");
+    }
+  };
 
   const getStatusBadge = (status: string) => {
     switch (status) {
@@ -407,6 +423,17 @@ export const EmployeeList: React.FC<EmployeeListProps> = ({ onSelectEmployee }) 
                               <Edit className="h-4 w-4" />
                             </Button>
                           )}
+                          {isAdmin && (
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => handleDeleteEmployee(emp)}
+                              title="Hard Delete Employee"
+                              className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          )}
                         </td>
                       </tr>
                     ))}
@@ -444,7 +471,21 @@ export const EmployeeList: React.FC<EmployeeListProps> = ({ onSelectEmployee }) 
                           </div>
                         </div>
                       </div>
-                      {getStatusBadge(emp.employmentStatus)}
+                      <div className="flex items-center gap-2">
+                        {getStatusBadge(emp.employmentStatus)}
+                        {isAdmin && (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleDeleteEmployee(emp);
+                            }}
+                            className="p-1 rounded text-destructive hover:bg-destructive/10"
+                            title="Hard Delete Employee"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        )}
+                      </div>
                     </div>
 
                     <div className="grid grid-cols-2 gap-2 text-xs text-muted-foreground pt-1">

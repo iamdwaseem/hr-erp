@@ -8,12 +8,16 @@ import {
   Users,
   Phone,
   User,
+  Trash2,
 } from "lucide-react";
 import {
   useTransportVehicles,
   useActivateVehicle,
   useDeactivateVehicle,
+  useDeleteVehicle,
 } from "../../hooks/use-transport";
+import { useAuth } from "../../hooks/use-auth";
+import { ROLES } from "../../../shared/constants/roles";
 import { Button } from "../../components/ui/button";
 import { Input } from "../../components/ui/input";
 import { Select } from "../../components/ui/select";
@@ -30,6 +34,8 @@ export const VehiclesTab: React.FC<VehiclesTabProps> = ({
   onOpenNewVehicle,
   onEditVehicle,
 }) => {
+  const { hasRole } = useAuth();
+  const isAdmin = hasRole(ROLES.ADMIN);
   const [searchInput, setSearchInput] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [typeFilter, setTypeFilter] = useState("");
@@ -43,6 +49,7 @@ export const VehiclesTab: React.FC<VehiclesTabProps> = ({
 
   const activateVehicle = useActivateVehicle();
   const deactivateVehicle = useDeactivateVehicle();
+  const deleteVehicle = useDeleteVehicle();
 
   const handleToggleStatus = async (vehicle: TransportVehicle) => {
     try {
@@ -53,6 +60,24 @@ export const VehiclesTab: React.FC<VehiclesTabProps> = ({
       }
     } catch (err: any) {
       alert(err?.message || "Failed to toggle vehicle status");
+    }
+  };
+
+  const handleDeleteVehicle = async (vehicle: TransportVehicle) => {
+    const hasAssignments = (vehicle.activeAssignmentsCount ?? 0) > 0;
+    const warningMsg = isAdmin
+      ? `PERMANENT DELETE WARNING:\n\nAre you sure you want to permanently delete vehicle "${vehicle.registrationNumber}" (${vehicle.vehicleType})?${
+          hasAssignments ? "\n\nAssigned employees will remain assigned to their routes, but will have their vehicle reference unassigned." : ""
+        }\n\nThis action CANNOT be undone.`
+      : `Are you sure you want to delete vehicle "${vehicle.registrationNumber}"?`;
+
+    const confirmed = window.confirm(warningMsg);
+    if (!confirmed) return;
+
+    try {
+      await deleteVehicle.mutateAsync(vehicle.id);
+    } catch (err: any) {
+      alert(err?.message || "Failed to delete vehicle");
     }
   };
 
@@ -206,6 +231,15 @@ export const VehiclesTab: React.FC<VehiclesTabProps> = ({
                             >
                               <Power className="h-3.5 w-3.5 mr-1" />
                               {isActive ? "Deactivate" : "Activate"}
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-8 px-2 text-xs text-destructive hover:bg-destructive/10"
+                              onClick={() => handleDeleteVehicle(v)}
+                              title="Delete Vehicle"
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
                             </Button>
                           </div>
                         </td>

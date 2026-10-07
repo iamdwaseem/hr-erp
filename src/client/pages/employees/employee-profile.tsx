@@ -23,6 +23,7 @@ import {
   HeartHandshake,
   PhoneCall,
   Bus,
+  Trash2,
 } from "lucide-react";
 import { apiClient } from "../../lib/api-client";
 import { useAuth } from "../../hooks/use-auth";
@@ -79,7 +80,27 @@ export const EmployeeProfile: React.FC<EmployeeProfileProps> = ({
   const [isWorkPermitDialogOpen, setIsWorkPermitDialogOpen] = useState(false);
 
   const canEdit = hasRole([ROLES.ADMIN, ROLES.HR]);
+  const isAdmin = hasRole(ROLES.ADMIN);
   const isEmployeeRole = false;
+
+  const handleDeleteEmployee = async () => {
+    if (!employee) return;
+    const confirmed = window.confirm(
+      `PERMANENT DELETE WARNING:\n\nAre you sure you want to permanently delete employee "${employee.fullName}" (${employee.employeeCode})?\n\nThis will permanently remove all associated documents, passports, visas, work permits, and transport assignments. This action CANNOT be undone.`
+    );
+    if (!confirmed) return;
+
+    try {
+      await apiClient.delete(`/employees/${employee.id}`);
+      if (onBack) {
+        onBack();
+      } else {
+        window.location.reload();
+      }
+    } catch (err: any) {
+      alert(err.message || "Failed to delete employee");
+    }
+  };
 
   // 1. Fetch Employee Record
   const {
@@ -326,12 +347,25 @@ export const EmployeeProfile: React.FC<EmployeeProfileProps> = ({
           <div />
         )}
 
-        {canEdit && (
-          <Button onClick={() => setIsEditDialogOpen(true)} className="gap-2" size="sm">
-            <Edit className="h-4 w-4" />
-            <span>Edit Employee</span>
-          </Button>
-        )}
+        <div className="flex items-center gap-2">
+          {canEdit && (
+            <Button onClick={() => setIsEditDialogOpen(true)} className="gap-2" size="sm">
+              <Edit className="h-4 w-4" />
+              <span>Edit Employee</span>
+            </Button>
+          )}
+          {isAdmin && (
+            <Button
+              variant="destructive"
+              onClick={handleDeleteEmployee}
+              className="gap-2"
+              size="sm"
+            >
+              <Trash2 className="h-4 w-4" />
+              <span>Delete Employee</span>
+            </Button>
+          )}
+        </div>
       </div>
 
       {/* Top Header Section */}

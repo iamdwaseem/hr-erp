@@ -8,12 +8,16 @@ import {
   MapPin,
   Building,
   Users,
+  Trash2,
 } from "lucide-react";
 import {
   useTransportRoutes,
   useActivateRoute,
   useDeactivateRoute,
+  useDeleteRoute,
 } from "../../hooks/use-transport";
+import { useAuth } from "../../hooks/use-auth";
+import { ROLES } from "../../../shared/constants/roles";
 import { Button } from "../../components/ui/button";
 import { Input } from "../../components/ui/input";
 import { Select } from "../../components/ui/select";
@@ -30,6 +34,8 @@ export const RoutesTab: React.FC<RoutesTabProps> = ({
   onOpenNewRoute,
   onEditRoute,
 }) => {
+  const { hasRole } = useAuth();
+  const isAdmin = hasRole(ROLES.ADMIN);
   const [searchInput, setSearchInput] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
 
@@ -41,6 +47,7 @@ export const RoutesTab: React.FC<RoutesTabProps> = ({
 
   const activateRoute = useActivateRoute();
   const deactivateRoute = useDeactivateRoute();
+  const deleteRoute = useDeleteRoute();
 
   const handleToggleStatus = async (route: TransportRoute) => {
     try {
@@ -51,6 +58,24 @@ export const RoutesTab: React.FC<RoutesTabProps> = ({
       }
     } catch (err: any) {
       alert(err?.message || "Failed to toggle route status");
+    }
+  };
+
+  const handleDeleteRoute = async (route: TransportRoute) => {
+    const hasAssignments = (route.activeAssignmentsCount ?? 0) > 0;
+    const warningMsg = isAdmin
+      ? `PERMANENT DELETE WARNING:\n\nAre you sure you want to permanently delete transport route "${route.name}" (${route.code})?${
+          hasAssignments ? "\n\nThis will also remove all employee assignments associated with this route." : ""
+        }\n\nThis action CANNOT be undone.`
+      : `Are you sure you want to delete transport route "${route.name}" (${route.code})?`;
+
+    const confirmed = window.confirm(warningMsg);
+    if (!confirmed) return;
+
+    try {
+      await deleteRoute.mutateAsync(route.id);
+    } catch (err: any) {
+      alert(err?.message || "Failed to delete route");
     }
   };
 
@@ -186,6 +211,15 @@ export const RoutesTab: React.FC<RoutesTabProps> = ({
                             >
                               <Power className="h-3.5 w-3.5 mr-1" />
                               {isActive ? "Deactivate" : "Activate"}
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-8 px-2 text-xs text-destructive hover:bg-destructive/10"
+                              onClick={() => handleDeleteRoute(r)}
+                              title="Delete Route"
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
                             </Button>
                           </div>
                         </td>

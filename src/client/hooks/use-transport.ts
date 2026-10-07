@@ -283,3 +283,41 @@ export function useEndAssignment() {
     },
   });
 }
+
+export function useDeleteRoute() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => apiClient.delete<{ message: string; id: string }>(`/transport/routes/${id}`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: transportKeys.routes() });
+      queryClient.invalidateQueries({ queryKey: transportKeys.assignments() });
+      queryClient.invalidateQueries({ queryKey: transportKeys.overview() });
+    },
+  });
+}
+
+export function useDeleteVehicle() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => apiClient.delete<{ message: string; id: string }>(`/transport/vehicles/${id}`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: transportKeys.vehicles() });
+      queryClient.invalidateQueries({ queryKey: transportKeys.assignments() });
+      queryClient.invalidateQueries({ queryKey: transportKeys.overview() });
+    },
+  });
+}
+
+export function useDeleteAssignment() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => apiClient.delete<{ deleted: boolean; message: string; id: string }>(`/transport/assignments/${id}`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: transportKeys.assignments() });
+      queryClient.invalidateQueries({ queryKey: transportKeys.overview() });
+      queryClient.invalidateQueries({ queryKey: transportKeys.routes() });
+      queryClient.invalidateQueries({ queryKey: transportKeys.vehicles() });
+    },
+  });
+}
+
