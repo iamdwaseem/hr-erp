@@ -151,14 +151,15 @@ auditLogsRoutes.get("/", async (c) => {
 
   // Search filter
   if (search) {
+    const searchLower = search.toLowerCase();
     conditions.push(
       or(
-        like(sql`lower(${users.fullName})`, `%${search}%`),
-        like(sql`lower(${users.email})`, `%${search}%`),
-        like(sql`lower(${auditLogs.action})`, `%${search}%`),
-        like(sql`lower(${auditLogs.resourceType})`, `%${search}%`),
-        like(sql`lower(${auditLogs.resourceId})`, `%${search}%`),
-        like(sql`lower(${auditLogs.details})`, `%${search}%`)
+        like(sql`lower(${users.fullName})`, `%${searchLower}%`),
+        like(sql`lower(${users.email})`, `%${searchLower}%`),
+        like(sql`lower(${auditLogs.action})`, `%${searchLower}%`),
+        like(sql`lower(${auditLogs.resourceType})`, `%${searchLower}%`),
+        like(sql`lower(${auditLogs.resourceId})`, `%${searchLower}%`),
+        like(sql`lower(${auditLogs.details})`, `%${searchLower}%`)
       )
     );
   }

@@ -11,7 +11,7 @@ import { auditLogs } from "../db/schema/audit";
 import { ROLES, type UserRole } from "../../shared/constants/roles";
 import type { SafeUser } from "../../shared/types/auth";
 
-import { verifyPassword } from "../utils/password";
+import { verifyPassword, hashPassword } from "../utils/password";
 
 export const authRoutes = new Hono<AppContext>();
 
@@ -105,6 +105,22 @@ authRoutes.post("/login", async (c) => {
     } else {
       const demoAccount = DEMO_USERS[normalizedEmail];
       if (demoAccount && password === demoAccount.password) {
+        try {
+          const pwdHash = await hashPassword(demoAccount.password);
+          const nowStr = new Date().toISOString();
+          await db.insert(users).values({
+            id: demoAccount.id,
+            email: demoAccount.email,
+            passwordHash: pwdHash,
+            fullName: demoAccount.fullName,
+            role: demoAccount.role,
+            isActive: demoAccount.isActive,
+            createdAt: nowStr,
+            updatedAt: nowStr,
+          }).onConflictDoNothing();
+        } catch {
+          // Ignore error if insert fails
+        }
         matchedUser = {
           id: demoAccount.id,
           email: demoAccount.email,
@@ -119,6 +135,22 @@ authRoutes.post("/login", async (c) => {
   } catch {
     const demoAccount = DEMO_USERS[normalizedEmail];
     if (demoAccount && password === demoAccount.password) {
+      try {
+        const pwdHash = await hashPassword(demoAccount.password);
+        const nowStr = new Date().toISOString();
+        await db.insert(users).values({
+          id: demoAccount.id,
+          email: demoAccount.email,
+          passwordHash: pwdHash,
+          fullName: demoAccount.fullName,
+          role: demoAccount.role,
+          isActive: demoAccount.isActive,
+          createdAt: nowStr,
+          updatedAt: nowStr,
+        }).onConflictDoNothing();
+      } catch {
+        // Ignore error if insert fails
+      }
       matchedUser = {
         id: demoAccount.id,
         email: demoAccount.email,
