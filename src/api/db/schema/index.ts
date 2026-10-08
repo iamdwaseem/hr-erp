@@ -5,6 +5,8 @@ import * as employeesSchema from "./employees";
 import * as documentsSchema from "./documents";
 import * as transportSchema from "./transport";
 import * as payrollSchema from "./payroll";
+import * as attendanceSchema from "./attendance";
+import * as leaveSchema from "./leave";
 
 export const schema = {
   ...usersSchema,
@@ -14,6 +16,8 @@ export const schema = {
   ...documentsSchema,
   ...transportSchema,
   ...payrollSchema,
+  ...attendanceSchema,
+  ...leaveSchema,
 };
 
 export * from "./users";
@@ -23,3 +27,5 @@ export * from "./employees";
 export * from "./documents";
 export * from "./transport";
 export * from "./payroll";
+export * from "./attendance";
+export * from "./leave";

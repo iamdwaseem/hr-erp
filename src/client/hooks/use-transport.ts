@@ -5,6 +5,8 @@ import type {
   TransportVehicle,
   TransportAssignment,
   TransportOverview,
+  TransportTrip,
+  TransportTripPassenger,
 } from "../../shared/types/transport";
 import type {
   CreateRouteInput,
@@ -31,6 +33,8 @@ export const transportKeys = {
   assignmentDetail: (id: string) => [...transportKeys.assignments(), "detail", id] as const,
   employeeCurrent: (employeeId: string) => [...transportKeys.assignments(), "employee-current", employeeId] as const,
   employeeHistory: (employeeId: string) => [...transportKeys.assignments(), "employee-history", employeeId] as const,
+  trips: (serviceDate?: string) => [...transportKeys.all, "trips", serviceDate] as const,
+  tripPassengers: (tripId: string) => [...transportKeys.all, "trip-passengers", tripId] as const,
 };
 
 // 1. Overview
@@ -317,6 +321,54 @@ export function useDeleteAssignment() {
       queryClient.invalidateQueries({ queryKey: transportKeys.overview() });
       queryClient.invalidateQueries({ queryKey: transportKeys.routes() });
       queryClient.invalidateQueries({ queryKey: transportKeys.vehicles() });
+    },
+  });
+}
+
+export function useTransportTrips(serviceDate?: string) {
+  return useQuery<TransportTrip[]>({
+    queryKey: transportKeys.trips(serviceDate),
+    queryFn: () => apiClient.get<TransportTrip[]>("/transport/trips", { params: { serviceDate } }),
+  });
+}
+
+export function useCreateTransportTrip() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (data: { routeId: string; vehicleId?: string | null; serviceDate: string; shift: string; direction: "PICKUP" | "DROPOFF"; notes?: string | null }) =>
+      apiClient.post<TransportTrip>("/transport/trips", data),
+    onSuccess: (_, data) => {
+      queryClient.invalidateQueries({ queryKey: transportKeys.trips(data.serviceDate) });
+      queryClient.invalidateQueries({ queryKey: transportKeys.overview() });
+    },
+  });
+}
+
+export function useTripPassengers(tripId: string | null) {
+  return useQuery<TransportTripPassenger[]>({
+    queryKey: transportKeys.tripPassengers(tripId || ""),
+    queryFn: () => apiClient.get<TransportTripPassenger[]>(`/transport/trips/${tripId}/passengers`),
+    enabled: Boolean(tripId),
+  });
+}
+
+export function useUpdateTripStatus() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, status }: { id: string; status: "planned" | "ready" | "in_progress" | "completed" | "cancelled" }) =>
+      apiClient.patch<TransportTrip>(`/transport/trips/${id}/status`, { status }),
+    onSuccess: (trip) => queryClient.invalidateQueries({ queryKey: transportKeys.trips(trip.serviceDate) }),
+  });
+}
+
+export function useUpdateBoardingStatus() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ tripId, passengerId, boardingStatus }: { tripId: string; passengerId: string; boardingStatus: "planned" | "boarded" | "absent" | "replaced" }) =>
+      apiClient.patch(`/transport/trips/${tripId}/passengers/${passengerId}`, { boardingStatus }),
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: transportKeys.tripPassengers(variables.tripId) });
+      queryClient.invalidateQueries({ queryKey: transportKeys.trips() });
     },
   });
 }

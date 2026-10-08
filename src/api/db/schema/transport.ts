@@ -29,6 +29,28 @@ export const transportRoutes = sqliteTable(
   })
 );
 
+export const transportRouteStops = sqliteTable(
+  "transport_route_stops",
+  {
+    id: text("id").primaryKey(),
+    routeId: text("route_id")
+      .notNull()
+      .references(() => transportRoutes.id, { onDelete: "cascade" }),
+    sequence: integer("sequence").notNull(),
+    name: text("name").notNull(),
+    location: text("location").notNull(),
+    pickupTime: text("pickup_time"),
+    dropoffTime: text("dropoff_time"),
+    status: text("status").notNull().default("active"),
+    createdAt: text("created_at").notNull().$defaultFn(() => new Date().toISOString()),
+    updatedAt: text("updated_at").notNull().$defaultFn(() => new Date().toISOString()),
+  },
+  (table) => ({
+    routeSequenceIdx: index("route_stop_sequence_idx").on(table.routeId, table.sequence),
+    routeStatusIdx: index("route_stop_status_idx").on(table.routeId, table.status),
+  })
+);
+
 export const transportVehicles = sqliteTable(
   "transport_vehicles",
   {
@@ -67,6 +89,8 @@ export const employeeTransportAssignments = sqliteTable(
       onDelete: "set null",
     }),
     pickupPoint: text("pickup_point"),
+    accommodation: text("accommodation"),
+    shift: text("shift").notNull().default("GENERAL"),
     effectiveFrom: text("effective_from").notNull(),
     effectiveTo: text("effective_to"),
     status: text("status").notNull().default("active"),
@@ -87,8 +111,53 @@ export const employeeTransportAssignments = sqliteTable(
   })
 );
 
+export const transportTrips = sqliteTable(
+  "transport_trips",
+  {
+    id: text("id").primaryKey(),
+    routeId: text("route_id").notNull().references(() => transportRoutes.id, { onDelete: "restrict" }),
+    vehicleId: text("vehicle_id").references(() => transportVehicles.id, { onDelete: "set null" }),
+    serviceDate: text("service_date").notNull(),
+    shift: text("shift").notNull().default("GENERAL"),
+    direction: text("direction").notNull().default("PICKUP"),
+    driverName: text("driver_name"),
+    driverPhone: text("driver_phone"),
+    status: text("status").notNull().default("planned"),
+    notes: text("notes"),
+    createdAt: text("created_at").notNull().$defaultFn(() => new Date().toISOString()),
+    updatedAt: text("updated_at").notNull().$defaultFn(() => new Date().toISOString()),
+  },
+  (table) => ({
+    serviceDateIdx: index("transport_trip_date_idx").on(table.serviceDate),
+    routeDateIdx: index("transport_trip_route_date_idx").on(table.routeId, table.serviceDate),
+    statusIdx: index("transport_trip_status_idx").on(table.status),
+  })
+);
+
+export const transportTripPassengers = sqliteTable(
+  "transport_trip_passengers",
+  {
+    id: text("id").primaryKey(),
+    tripId: text("trip_id").notNull().references(() => transportTrips.id, { onDelete: "cascade" }),
+    employeeId: text("employee_id").notNull().references(() => employees.id, { onDelete: "cascade" }),
+    assignmentId: text("assignment_id").references(() => employeeTransportAssignments.id, { onDelete: "set null" }),
+    boardingStatus: text("boarding_status").notNull().default("planned"),
+    boardedAt: text("boarded_at"),
+    notes: text("notes"),
+    createdAt: text("created_at").notNull().$defaultFn(() => new Date().toISOString()),
+    updatedAt: text("updated_at").notNull().$defaultFn(() => new Date().toISOString()),
+  },
+  (table) => ({
+    tripEmployeeIdx: uniqueIndex("transport_trip_employee_idx").on(table.tripId, table.employeeId),
+    tripIdx: index("transport_passenger_trip_idx").on(table.tripId),
+    employeeIdx: index("transport_passenger_employee_idx").on(table.employeeId),
+  })
+);
+
 export type TransportRouteEntity = typeof transportRoutes.$inferSelect;
 export type NewTransportRouteEntity = typeof transportRoutes.$inferInsert;
+export type TransportRouteStopEntity = typeof transportRouteStops.$inferSelect;
+export type NewTransportRouteStopEntity = typeof transportRouteStops.$inferInsert;
 
 export type TransportVehicleEntity = typeof transportVehicles.$inferSelect;
 export type NewTransportVehicleEntity = typeof transportVehicles.$inferInsert;
@@ -97,3 +166,7 @@ export type EmployeeTransportAssignmentEntity =
   typeof employeeTransportAssignments.$inferSelect;
 export type NewEmployeeTransportAssignmentEntity =
   typeof employeeTransportAssignments.$inferInsert;
+export type TransportTripEntity = typeof transportTrips.$inferSelect;
+export type NewTransportTripEntity = typeof transportTrips.$inferInsert;
+export type TransportTripPassengerEntity = typeof transportTripPassengers.$inferSelect;
+export type NewTransportTripPassengerEntity = typeof transportTripPassengers.$inferInsert;

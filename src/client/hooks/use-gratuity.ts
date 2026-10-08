@@ -20,7 +20,7 @@ export function useCalculateGratuity() {
     }) => {
       const res = await apiClient.post<
         GratuityCalculationResult & { employeeId: string; employeeName: string; employeeCode: string }
-      >("/api/gratuity/calculate", payload);
+      >("/gratuity/calculate", payload);
       return res;
     },
   });
@@ -41,7 +41,7 @@ export function useSaveGratuityRecord() {
       policyVersion?: string;
       notes?: string | null;
     }) => {
-      const res = await apiClient.post<GratuityRecord>("/api/gratuity/records", payload);
+      const res = await apiClient.post<GratuityRecord>("/gratuity/records", payload);
       return res;
     },
     onSuccess: (_, vars) => {
@@ -55,7 +55,7 @@ export function useGratuityRecords() {
   return useQuery({
     queryKey: gratuityKeys.records(),
     queryFn: async () => {
-      const res = await apiClient.get<GratuityRecord[]>("/api/gratuity/records");
+      const res = await apiClient.get<GratuityRecord[]>("/gratuity/records");
       return res || [];
     },
   });
@@ -66,7 +66,7 @@ export function useEmployeeGratuityHistory(employeeId: string | null) {
     queryKey: gratuityKeys.employeeHistory(employeeId || ""),
     queryFn: async () => {
       if (!employeeId) return [];
-      const res = await apiClient.get<GratuityRecord[]>(`/api/gratuity/employees/${employeeId}`);
+      const res = await apiClient.get<GratuityRecord[]>(`/gratuity/employees/${employeeId}`);
       return res || [];
     },
     enabled: Boolean(employeeId),

@@ -1,5 +1,5 @@
 import { Hono } from "hono";
-import { eq, and, isNotNull, like, sql } from "drizzle-orm";
+import { eq, and, inArray, isNotNull, like, sql } from "drizzle-orm";
 import type { AppContext } from "../types";
 import { requireAuth } from "../middleware/auth";
 import { ROLES } from "../../shared/constants/roles";
@@ -278,16 +278,23 @@ expiryRoutes.get("/documents", async (c) => {
 
   const empMap = new Map(empRows.map((e) => [e.id, e]));
   const employeeIds = empRows.map((e) => e.id);
+  const employeeIdChunks: string[][] = [];
+  for (let index = 0; index < employeeIds.length; index += 50) {
+    employeeIdChunks.push(employeeIds.slice(index, index + 50));
+  }
 
   // Helper to query documents by employee list
   const allItems: ExpiringDocumentItem[] = [];
 
   // 1. Passports
   if (!docTypeFilter || docTypeFilter === "all" || docTypeFilter.toUpperCase() === "PASSPORT") {
-    const passportRows = await db
-      .select()
-      .from(employeePassports)
-      .where(sql`${employeePassports.employeeId} IN ${employeeIds}`);
+    const passportRows = (
+      await Promise.all(
+        employeeIdChunks.map((ids) =>
+          db.select().from(employeePassports).where(inArray(employeePassports.employeeId, ids))
+        )
+      )
+    ).flat();
 
     for (const p of passportRows) {
       const emp = empMap.get(p.employeeId);
@@ -315,10 +322,13 @@ expiryRoutes.get("/documents", async (c) => {
 
   // 2. Visas
   if (!docTypeFilter || docTypeFilter === "all" || docTypeFilter.toUpperCase() === "VISA") {
-    const visaRows = await db
-      .select()
-      .from(employeeVisas)
-      .where(sql`${employeeVisas.employeeId} IN ${employeeIds}`);
+    const visaRows = (
+      await Promise.all(
+        employeeIdChunks.map((ids) =>
+          db.select().from(employeeVisas).where(inArray(employeeVisas.employeeId, ids))
+        )
+      )
+    ).flat();
 
     for (const v of visaRows) {
       const emp = empMap.get(v.employeeId);
@@ -346,10 +356,13 @@ expiryRoutes.get("/documents", async (c) => {
 
   // 3. Work Permits
   if (!docTypeFilter || docTypeFilter === "all" || docTypeFilter.toUpperCase() === "WORK_PERMIT") {
-    const wpRows = await db
-      .select()
-      .from(employeeWorkPermits)
-      .where(sql`${employeeWorkPermits.employeeId} IN ${employeeIds}`);
+    const wpRows = (
+      await Promise.all(
+        employeeIdChunks.map((ids) =>
+          db.select().from(employeeWorkPermits).where(inArray(employeeWorkPermits.employeeId, ids))
+        )
+      )
+    ).flat();
 
     for (const wp of wpRows) {
       const emp = empMap.get(wp.employeeId);
@@ -381,18 +394,18 @@ expiryRoutes.get("/documents", async (c) => {
       ? eq(employeeDocuments.documentType, docTypeFilter.toUpperCase())
       : undefined;
 
-  const docConditions = [
-    sql`${employeeDocuments.employeeId} IN ${employeeIds}`,
-    isNotNull(employeeDocuments.expiryDate),
-  ];
-  if (uploadedDocTypeCondition) {
-    docConditions.push(uploadedDocTypeCondition);
-  }
-
-  const uploadedRows = await db
-    .select()
-    .from(employeeDocuments)
-    .where(and(...docConditions));
+  const uploadedRows = (
+    await Promise.all(
+      employeeIdChunks.map((ids) => {
+        const docConditions = [
+          inArray(employeeDocuments.employeeId, ids),
+          isNotNull(employeeDocuments.expiryDate),
+        ];
+        if (uploadedDocTypeCondition) docConditions.push(uploadedDocTypeCondition);
+        return db.select().from(employeeDocuments).where(and(...docConditions));
+      })
+    )
+  ).flat();
 
   for (const doc of uploadedRows) {
     if (!doc.expiryDate || doc.expiryDate.trim() === "") continue;

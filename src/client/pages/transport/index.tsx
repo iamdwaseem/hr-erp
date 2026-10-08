@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { LayoutDashboard, Route, Bus, Users } from "lucide-react";
+import { LayoutDashboard, Route, Bus, Users, CalendarDays } from "lucide-react";
 import { TransportOverviewTab } from "./transport-overview";
 import { RoutesTab } from "./routes-tab";
 import { VehiclesTab } from "./vehicles-tab";
@@ -8,13 +8,14 @@ import { RouteDialog } from "./route-dialog";
 import { VehicleDialog } from "./vehicle-dialog";
 import { AssignmentDialog } from "./assignment-dialog";
 import { EndAssignmentDialog } from "./end-assignment-dialog";
+import { DailyDispatch } from "./daily-dispatch";
 import type {
   TransportRoute,
   TransportVehicle,
   TransportAssignment,
 } from "../../../shared/types/transport";
 
-export type TransportTabType = "overview" | "routes" | "vehicles" | "assignments";
+export type TransportTabType = "overview" | "routes" | "vehicles" | "assignments" | "dispatch";
 
 interface TransportPageProps {
   initialTab?: TransportTabType;
@@ -95,6 +96,7 @@ export const TransportPage: React.FC<TransportPageProps> = ({
             { id: "routes", label: "Routes", icon: Route },
             { id: "vehicles", label: "Vehicles", icon: Bus },
             { id: "assignments", label: "Assignments", icon: Users },
+            { id: "dispatch", label: "Daily Dispatch", icon: CalendarDays },
           ].map((tab) => {
             const Icon = tab.icon;
             const isActive = activeTab === tab.id;
@@ -148,6 +150,8 @@ export const TransportPage: React.FC<TransportPageProps> = ({
           onViewEmployee={onViewEmployee}
         />
       )}
+
+      {activeTab === "dispatch" && <DailyDispatch />}
 
       {/* Modals */}
       <RouteDialog

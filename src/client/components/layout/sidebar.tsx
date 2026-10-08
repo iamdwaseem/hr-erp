@@ -13,6 +13,8 @@ import {
   CreditCard,
   Calculator,
   FileText,
+  CalendarCheck,
+  ClipboardList,
 } from "lucide-react";
 import { useAuth } from "../../hooks/use-auth";
 import { cn } from "../../lib/utils";
@@ -69,6 +71,18 @@ const navItems: NavItem[] = [
     href: "/transport",
     icon: Bus,
     permission: PERMISSIONS.TRANSPORT_READ,
+  },
+  {
+    title: "Attendance Import",
+    href: "/attendance",
+    icon: CalendarCheck,
+    permission: PERMISSIONS.ATTENDANCE_READ,
+  },
+  {
+    title: "Leave Management",
+    href: "/leave",
+    icon: ClipboardList,
+    permission: PERMISSIONS.LEAVE_READ,
   },
   {
     title: "HR Action Center",

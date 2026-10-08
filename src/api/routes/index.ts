@@ -12,6 +12,8 @@ import { salaryRoutes } from "./salary";
 import { payrollRoutes } from "./payroll";
 import { gratuityRoutes } from "./gratuity";
 import { payslipsRoutes } from "./payslips";
+import { attendanceRoutes } from "./attendance";
+import { leaveRoutes } from "./leave";
 
 export const apiRouter = new Hono<AppContext>();
 
@@ -27,3 +29,5 @@ apiRouter.route("/salary", salaryRoutes);
 apiRouter.route("/payroll", payrollRoutes);
 apiRouter.route("/gratuity", gratuityRoutes);
 apiRouter.route("/payslips", payslipsRoutes);
+apiRouter.route("/attendance", attendanceRoutes);
+apiRouter.route("/leave", leaveRoutes);

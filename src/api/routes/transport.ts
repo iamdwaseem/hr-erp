@@ -2,13 +2,16 @@ import { Hono } from "hono";
 import { asc, desc, eq, and, ne, sql, or, like } from "drizzle-orm";
 import type { AppContext } from "../types";
 import { requireAuth } from "../middleware/auth";
-import { requireRole } from "../middleware/rbac";
-import { ROLES } from "../../shared/constants/roles";
+import { requirePermissionMiddleware, requireRole } from "../middleware/rbac";
+import { PERMISSIONS, ROLES } from "../../shared/constants/roles";
 import { getDb } from "../db/client";
 import {
   transportRoutes,
+  transportRouteStops,
   transportVehicles,
   employeeTransportAssignments,
+  transportTrips,
+  transportTripPassengers,
 } from "../db/schema/transport";
 import { branches } from "../db/schema/masters";
 import { employees } from "../db/schema/employees";
@@ -23,13 +26,17 @@ import {
   createAssignmentSchema,
   updateAssignmentSchema,
   endAssignmentSchema,
+  createRouteStopSchema,
+  updateRouteStopSchema,
+  createTransportTripSchema,
+  updateTripStatusSchema,
+  updateBoardingStatusSchema,
 } from "../../shared/schemas/transport";
 
 export const transportRoutesHandler = new Hono<AppContext>();
 
 // Require authentication and RBAC for all transport endpoints
 transportRoutesHandler.use("*", requireAuth());
-transportRoutesHandler.use("*", requireRole(ROLES.ADMIN, ROLES.HR));
 
 // Helper for audit logging
 async function logTransportAudit(
@@ -67,9 +74,10 @@ async function logTransportAudit(
 // 1. OVERVIEW & STATS
 // ==========================================
 
-transportRoutesHandler.get("/overview", async (c) => {
+transportRoutesHandler.get("/overview", requirePermissionMiddleware(PERMISSIONS.TRANSPORT_READ), async (c) => {
   try {
     const db = getDb(c.env.DB);
+    const today = new Date().toISOString().split("T")[0];
 
     // Count active routes
     const activeRoutesResult = await db
@@ -95,7 +103,13 @@ transportRoutesHandler.get("/overview", async (c) => {
         count: sql<number>`count(distinct ${employeeTransportAssignments.employeeId})`,
       })
       .from(employeeTransportAssignments)
-      .where(eq(employeeTransportAssignments.status, "active"));
+      .where(
+        and(
+          eq(employeeTransportAssignments.status, "active"),
+          sql`${employeeTransportAssignments.effectiveFrom} <= ${today}`,
+          or(sql`${employeeTransportAssignments.effectiveTo} IS NULL`, sql`${employeeTransportAssignments.effectiveTo} >= ${today}`)
+        )
+      );
     const assignedEmployeesCount = Number(activeAssignmentsCountResult[0]?.count ?? 0);
 
     const availableCapacity = Math.max(0, totalVehicleCapacity - assignedEmployeesCount);
@@ -152,7 +166,7 @@ transportRoutesHandler.get("/overview", async (c) => {
 // 2. ROUTES
 // ==========================================
 
-transportRoutesHandler.get("/routes", async (c) => {
+transportRoutesHandler.get("/routes", requirePermissionMiddleware(PERMISSIONS.TRANSPORT_READ), async (c) => {
   try {
     const db = getDb(c.env.DB);
     const search = c.req.query("search")?.trim().toLowerCase();
@@ -192,6 +206,8 @@ transportRoutesHandler.get("/routes", async (c) => {
           SELECT count(*) FROM employee_transport_assignments
           WHERE employee_transport_assignments.route_id = ${transportRoutes.id}
           AND employee_transport_assignments.status = 'active'
+          AND employee_transport_assignments.effective_from <= date('now')
+          AND (employee_transport_assignments.effective_to IS NULL OR employee_transport_assignments.effective_to >= date('now'))
         )`,
       })
       .from(transportRoutes)
@@ -211,7 +227,7 @@ transportRoutesHandler.get("/routes", async (c) => {
   }
 });
 
-transportRoutesHandler.get("/routes/:id", async (c) => {
+transportRoutesHandler.get("/routes/:id", requirePermissionMiddleware(PERMISSIONS.TRANSPORT_READ), async (c) => {
   try {
     const id = c.req.param("id");
     const db = getDb(c.env.DB);
@@ -229,6 +245,8 @@ transportRoutesHandler.get("/routes/:id", async (c) => {
           SELECT count(*) FROM employee_transport_assignments
           WHERE employee_transport_assignments.route_id = ${transportRoutes.id}
           AND employee_transport_assignments.status = 'active'
+          AND employee_transport_assignments.effective_from <= date('now')
+          AND (employee_transport_assignments.effective_to IS NULL OR employee_transport_assignments.effective_to >= date('now'))
         )`,
       })
       .from(transportRoutes)
@@ -251,7 +269,7 @@ transportRoutesHandler.get("/routes/:id", async (c) => {
   }
 });
 
-transportRoutesHandler.post("/routes", async (c) => {
+transportRoutesHandler.post("/routes", requirePermissionMiddleware(PERMISSIONS.TRANSPORT_MANAGE), async (c) => {
   try {
     const body = await c.req.json().catch(() => null);
     const parsed = createRouteSchema.safeParse(body);
@@ -314,7 +332,7 @@ transportRoutesHandler.post("/routes", async (c) => {
   }
 });
 
-transportRoutesHandler.put("/routes/:id", async (c) => {
+transportRoutesHandler.put("/routes/:id", requirePermissionMiddleware(PERMISSIONS.TRANSPORT_MANAGE), async (c) => {
   try {
     const id = c.req.param("id");
     const body = await c.req.json().catch(() => null);
@@ -324,67 +342,32 @@ transportRoutesHandler.put("/routes/:id", async (c) => {
     }
 
     const db = getDb(c.env.DB);
-    const existing = await db
-      .select()
-      .from(transportRoutes)
-      .where(eq(transportRoutes.id, id))
-      .limit(1);
+    const existing = await db.select().from(transportRoutes).where(eq(transportRoutes.id, id)).limit(1);
+    if (existing.length === 0) return jsonError(c, "NOT_FOUND", "Route not found", 404);
 
-    if (existing.length === 0) {
-      return jsonError(c, "NOT_FOUND", "Route not found", 404);
-    }
-
-    const updates: Partial<typeof transportRoutes.$inferInsert> = {
-      updatedAt: new Date().toISOString(),
-    };
-
+    const updates: Partial<typeof transportRoutes.$inferInsert> = { updatedAt: new Date().toISOString() };
     if (parsed.data.name !== undefined) updates.name = parsed.data.name;
     if (parsed.data.description !== undefined) updates.description = parsed.data.description || null;
     if (parsed.data.pickupPoints !== undefined) updates.pickupPoints = parsed.data.pickupPoints || null;
-    if (parsed.data.destinationBranchId !== undefined) {
-      if (parsed.data.destinationBranchId) {
-        const branchExists = await db
-          .select({ id: branches.id })
-          .from(branches)
-          .where(eq(branches.id, parsed.data.destinationBranchId))
-          .limit(1);
-        if (branchExists.length === 0) {
-          return jsonError(c, "BRANCH_NOT_FOUND", "Destination branch does not exist", 400);
-        }
-      }
-      updates.destinationBranchId = parsed.data.destinationBranchId || null;
-    }
+    if (parsed.data.destinationBranchId !== undefined) updates.destinationBranchId = parsed.data.destinationBranchId || null;
     if (parsed.data.status !== undefined) updates.status = parsed.data.status;
-
     if (parsed.data.code && parsed.data.code !== existing[0].code) {
-      const codeConflict = await db
-        .select({ id: transportRoutes.id })
-        .from(transportRoutes)
-        .where(and(eq(transportRoutes.code, parsed.data.code), ne(transportRoutes.id, id)))
-        .limit(1);
-      if (codeConflict.length > 0) {
-        return jsonError(c, "DUPLICATE_CODE", `Route with code "${parsed.data.code}" already exists`, 409);
-      }
+      const codeConflict = await db.select({ id: transportRoutes.id }).from(transportRoutes)
+        .where(and(eq(transportRoutes.code, parsed.data.code), ne(transportRoutes.id, id))).limit(1);
+      if (codeConflict.length > 0) return jsonError(c, "DUPLICATE_CODE", `Route with code "${parsed.data.code}" already exists`, 409);
       updates.code = parsed.data.code;
     }
 
     await db.update(transportRoutes).set(updates).where(eq(transportRoutes.id, id));
-
     await logTransportAudit(c, "transport:route:updated", "transport_route", id, updates);
-
-    const updated = await db
-      .select()
-      .from(transportRoutes)
-      .where(eq(transportRoutes.id, id))
-      .limit(1);
-
+    const updated = await db.select().from(transportRoutes).where(eq(transportRoutes.id, id)).limit(1);
     return jsonSuccess(c, updated[0]);
   } catch (error: any) {
     return jsonError(c, "INTERNAL_ERROR", error.message || "Failed to update route", 500);
   }
 });
 
-transportRoutesHandler.post("/routes/:id/activate", async (c) => {
+transportRoutesHandler.post("/routes/:id/activate", requirePermissionMiddleware(PERMISSIONS.TRANSPORT_MANAGE), async (c) => {
   try {
     const id = c.req.param("id");
     const db = getDb(c.env.DB);
@@ -411,7 +394,7 @@ transportRoutesHandler.post("/routes/:id/activate", async (c) => {
   }
 });
 
-transportRoutesHandler.post("/routes/:id/deactivate", async (c) => {
+transportRoutesHandler.post("/routes/:id/deactivate", requirePermissionMiddleware(PERMISSIONS.TRANSPORT_MANAGE), async (c) => {
   try {
     const id = c.req.param("id");
     const db = getDb(c.env.DB);
@@ -441,7 +424,7 @@ transportRoutesHandler.post("/routes/:id/deactivate", async (c) => {
 // Delete route:
 // - HR: blocked if any assignments exist (historical or active)
 // - ADMIN: force-deletes the route AND all its assignments regardless
-transportRoutesHandler.delete("/routes/:id", async (c) => {
+transportRoutesHandler.delete("/routes/:id", requirePermissionMiddleware(PERMISSIONS.TRANSPORT_MANAGE), async (c) => {
   try {
     const id = c.req.param("id");
     const user = c.get("user")!;
@@ -504,7 +487,7 @@ transportRoutesHandler.delete("/routes/:id", async (c) => {
 // 3. VEHICLES
 // ==========================================
 
-transportRoutesHandler.get("/vehicles", async (c) => {
+transportRoutesHandler.get("/vehicles", requirePermissionMiddleware(PERMISSIONS.TRANSPORT_READ), async (c) => {
   try {
     const db = getDb(c.env.DB);
     const search = c.req.query("search")?.trim().toLowerCase();
@@ -544,6 +527,8 @@ transportRoutesHandler.get("/vehicles", async (c) => {
           SELECT count(*) FROM employee_transport_assignments
           WHERE employee_transport_assignments.vehicle_id = ${transportVehicles.id}
           AND employee_transport_assignments.status = 'active'
+          AND employee_transport_assignments.effective_from <= date('now')
+          AND (employee_transport_assignments.effective_to IS NULL OR employee_transport_assignments.effective_to >= date('now'))
         )`,
       })
       .from(transportVehicles)
@@ -561,7 +546,7 @@ transportRoutesHandler.get("/vehicles", async (c) => {
   }
 });
 
-transportRoutesHandler.get("/vehicles/:id", async (c) => {
+transportRoutesHandler.get("/vehicles/:id", requirePermissionMiddleware(PERMISSIONS.TRANSPORT_READ), async (c) => {
   try {
     const id = c.req.param("id");
     const db = getDb(c.env.DB);
@@ -573,6 +558,8 @@ transportRoutesHandler.get("/vehicles/:id", async (c) => {
           SELECT count(*) FROM employee_transport_assignments
           WHERE employee_transport_assignments.vehicle_id = ${transportVehicles.id}
           AND employee_transport_assignments.status = 'active'
+          AND employee_transport_assignments.effective_from <= date('now')
+          AND (employee_transport_assignments.effective_to IS NULL OR employee_transport_assignments.effective_to >= date('now'))
         )`,
       })
       .from(transportVehicles)
@@ -593,7 +580,7 @@ transportRoutesHandler.get("/vehicles/:id", async (c) => {
   }
 });
 
-transportRoutesHandler.post("/vehicles", async (c) => {
+transportRoutesHandler.post("/vehicles", requirePermissionMiddleware(PERMISSIONS.TRANSPORT_MANAGE), async (c) => {
   try {
     const body = await c.req.json().catch(() => null);
     const parsed = createVehicleSchema.safeParse(body);
@@ -650,7 +637,7 @@ transportRoutesHandler.post("/vehicles", async (c) => {
   }
 });
 
-transportRoutesHandler.put("/vehicles/:id", async (c) => {
+transportRoutesHandler.put("/vehicles/:id", requirePermissionMiddleware(PERMISSIONS.TRANSPORT_MANAGE), async (c) => {
   try {
     const id = c.req.param("id");
     const body = await c.req.json().catch(() => null);
@@ -718,7 +705,7 @@ transportRoutesHandler.put("/vehicles/:id", async (c) => {
   }
 });
 
-transportRoutesHandler.post("/vehicles/:id/activate", async (c) => {
+transportRoutesHandler.post("/vehicles/:id/activate", requirePermissionMiddleware(PERMISSIONS.TRANSPORT_MANAGE), async (c) => {
   try {
     const id = c.req.param("id");
     const db = getDb(c.env.DB);
@@ -745,7 +732,7 @@ transportRoutesHandler.post("/vehicles/:id/activate", async (c) => {
   }
 });
 
-transportRoutesHandler.post("/vehicles/:id/deactivate", async (c) => {
+transportRoutesHandler.post("/vehicles/:id/deactivate", requirePermissionMiddleware(PERMISSIONS.TRANSPORT_MANAGE), async (c) => {
   try {
     const id = c.req.param("id");
     const db = getDb(c.env.DB);
@@ -775,7 +762,7 @@ transportRoutesHandler.post("/vehicles/:id/deactivate", async (c) => {
 // Delete vehicle:
 // - HR: blocked if any assignments exist (historical or active)
 // - ADMIN: force-deletes the vehicle AND nullifies vehicle reference in assignments
-transportRoutesHandler.delete("/vehicles/:id", async (c) => {
+transportRoutesHandler.delete("/vehicles/:id", requirePermissionMiddleware(PERMISSIONS.TRANSPORT_MANAGE), async (c) => {
   try {
     const id = c.req.param("id");
     const user = c.get("user")!;
@@ -838,7 +825,7 @@ transportRoutesHandler.delete("/vehicles/:id", async (c) => {
 // 4. ASSIGNMENTS
 // ==========================================
 
-transportRoutesHandler.get("/assignments", async (c) => {
+transportRoutesHandler.get("/assignments", requirePermissionMiddleware(PERMISSIONS.TRANSPORT_READ), async (c) => {
   try {
     const db = getDb(c.env.DB);
     const employeeId = c.req.query("employeeId");
@@ -924,7 +911,7 @@ transportRoutesHandler.get("/assignments", async (c) => {
   }
 });
 
-transportRoutesHandler.get("/assignments/employee/:employeeId/current", async (c) => {
+transportRoutesHandler.get("/assignments/employee/:employeeId/current", requirePermissionMiddleware(PERMISSIONS.TRANSPORT_READ), async (c) => {
   try {
     const employeeId = c.req.param("employeeId");
     const db = getDb(c.env.DB);
@@ -974,59 +961,7 @@ transportRoutesHandler.get("/assignments/employee/:employeeId/current", async (c
       .orderBy(desc(employeeTransportAssignments.effectiveFrom))
       .limit(1);
 
-    if (rows.length === 0) {
-      // Also check if there's any active assignment with future effectiveFrom
-      const anyActive = await db
-        .select({
-          assignment: employeeTransportAssignments,
-          employee: {
-            id: employees.id,
-            employeeCode: employees.employeeCode,
-            employeeId: employees.employeeId,
-            fullName: employees.fullName,
-            localMobile: employees.localMobile,
-            localEmail: employees.localEmail,
-            employmentStatus: employees.employmentStatus,
-          },
-          route: {
-            id: transportRoutes.id,
-            name: transportRoutes.name,
-            code: transportRoutes.code,
-            destinationBranchId: transportRoutes.destinationBranchId,
-          },
-          vehicle: {
-            id: transportVehicles.id,
-            registrationNumber: transportVehicles.registrationNumber,
-            vehicleType: transportVehicles.vehicleType,
-            driverName: transportVehicles.driverName,
-            driverPhone: transportVehicles.driverPhone,
-          },
-        })
-        .from(employeeTransportAssignments)
-        .leftJoin(employees, eq(employeeTransportAssignments.employeeId, employees.id))
-        .leftJoin(transportRoutes, eq(employeeTransportAssignments.routeId, transportRoutes.id))
-        .leftJoin(transportVehicles, eq(employeeTransportAssignments.vehicleId, transportVehicles.id))
-        .where(
-          and(
-            eq(employeeTransportAssignments.employeeId, employeeId),
-            eq(employeeTransportAssignments.status, "active")
-          )
-        )
-        .orderBy(desc(employeeTransportAssignments.effectiveFrom))
-        .limit(1);
-
-      if (anyActive.length === 0) {
-        return jsonSuccess(c, null);
-      }
-
-      const a = anyActive[0];
-      return jsonSuccess(c, {
-        ...a.assignment,
-        employee: a.employee,
-        route: a.route,
-        vehicle: a.vehicle?.id ? a.vehicle : null,
-      });
-    }
+    if (rows.length === 0) return jsonSuccess(c, null);
 
     const r = rows[0];
     return jsonSuccess(c, {
@@ -1040,7 +975,7 @@ transportRoutesHandler.get("/assignments/employee/:employeeId/current", async (c
   }
 });
 
-transportRoutesHandler.get("/assignments/employee/:employeeId/history", async (c) => {
+transportRoutesHandler.get("/assignments/employee/:employeeId/history", requirePermissionMiddleware(PERMISSIONS.TRANSPORT_READ), async (c) => {
   try {
     const employeeId = c.req.param("employeeId");
     const db = getDb(c.env.DB);
@@ -1079,7 +1014,7 @@ transportRoutesHandler.get("/assignments/employee/:employeeId/history", async (c
   }
 });
 
-transportRoutesHandler.get("/assignments/:id", async (c) => {
+transportRoutesHandler.get("/assignments/:id", requirePermissionMiddleware(PERMISSIONS.TRANSPORT_READ), async (c) => {
   try {
     const id = c.req.param("id");
     const db = getDb(c.env.DB);
@@ -1133,7 +1068,7 @@ transportRoutesHandler.get("/assignments/:id", async (c) => {
   }
 });
 
-transportRoutesHandler.post("/assignments", async (c) => {
+transportRoutesHandler.post("/assignments", requirePermissionMiddleware(PERMISSIONS.TRANSPORT_MANAGE), async (c) => {
   try {
     const body = await c.req.json().catch(() => null);
     const parsed = createAssignmentSchema.safeParse(body);
@@ -1146,6 +1081,8 @@ transportRoutesHandler.post("/assignments", async (c) => {
       routeId,
       vehicleId,
       pickupPoint,
+      accommodation,
+      shift = "GENERAL",
       effectiveFrom,
       effectiveTo,
       status = "active",
@@ -1219,6 +1156,24 @@ transportRoutesHandler.post("/assignments", async (c) => {
           400
         );
       }
+
+      const vehicleCapacity = (await db
+        .select({ capacity: transportVehicles.capacity })
+        .from(transportVehicles)
+        .where(eq(transportVehicles.id, vehicleId))
+        .limit(1))[0]?.capacity ?? 0;
+      const activeVehicleAssignments = await db
+        .select({ count: sql<number>`count(*)` })
+        .from(employeeTransportAssignments)
+        .where(
+          and(
+            eq(employeeTransportAssignments.vehicleId, vehicleId),
+            eq(employeeTransportAssignments.status, "active")
+          )
+        );
+      if (Number(activeVehicleAssignments[0]?.count ?? 0) >= vehicleCapacity) {
+        return jsonError(c, "VEHICLE_CAPACITY_EXCEEDED", "Selected vehicle has reached its passenger capacity", 409);
+      }
     }
 
     // Rule 4, 6, 7: An employee should not have multiple overlapping ACTIVE transport assignments.
@@ -1263,6 +1218,8 @@ transportRoutesHandler.post("/assignments", async (c) => {
       routeId,
       vehicleId: vehicleId || null,
       pickupPoint: pickupPoint || null,
+      accommodation: accommodation || null,
+      shift,
       effectiveFrom,
       effectiveTo: effectiveTo || null,
       status,
@@ -1279,6 +1236,8 @@ transportRoutesHandler.post("/assignments", async (c) => {
       routeId,
       vehicleId,
       pickupPoint,
+      accommodation,
+      shift,
       effectiveFrom,
       effectiveTo,
     });
@@ -1289,7 +1248,7 @@ transportRoutesHandler.post("/assignments", async (c) => {
   }
 });
 
-transportRoutesHandler.put("/assignments/:id", async (c) => {
+transportRoutesHandler.put("/assignments/:id", requirePermissionMiddleware(PERMISSIONS.TRANSPORT_MANAGE), async (c) => {
   try {
     const id = c.req.param("id");
     const body = await c.req.json().catch(() => null);
@@ -1351,6 +1310,7 @@ transportRoutesHandler.put("/assignments/:id", async (c) => {
     }
 
     const targetStatus = parsed.data.status !== undefined ? parsed.data.status : assignment.status;
+    const targetVehicleId = parsed.data.vehicleId !== undefined ? parsed.data.vehicleId : assignment.vehicleId;
     const targetStart = parsed.data.effectiveFrom !== undefined ? parsed.data.effectiveFrom : assignment.effectiveFrom;
     const targetEnd =
       parsed.data.effectiveTo !== undefined
@@ -1394,6 +1354,32 @@ transportRoutesHandler.put("/assignments/:id", async (c) => {
           409
         );
       }
+
+      if (targetVehicleId) {
+        const vehicleCapacity = (await db
+          .select({ capacity: transportVehicles.capacity })
+          .from(transportVehicles)
+          .where(eq(transportVehicles.id, targetVehicleId))
+          .limit(1))[0]?.capacity ?? 0;
+        const activeVehicleAssignments = await db
+          .select({ count: sql<number>`count(*)` })
+          .from(employeeTransportAssignments)
+          .where(
+            and(
+              eq(employeeTransportAssignments.vehicleId, targetVehicleId),
+              eq(employeeTransportAssignments.status, "active"),
+              ne(employeeTransportAssignments.id, id),
+              sql`${employeeTransportAssignments.effectiveFrom} <= ${targetEnd}`,
+              or(
+                sql`${employeeTransportAssignments.effectiveTo} IS NULL`,
+                sql`${employeeTransportAssignments.effectiveTo} >= ${targetStart}`
+              )
+            )
+          );
+        if (Number(activeVehicleAssignments[0]?.count ?? 0) >= vehicleCapacity) {
+          return jsonError(c, "VEHICLE_CAPACITY_EXCEEDED", "Selected vehicle has reached its passenger capacity", 409);
+        }
+      }
     }
 
     const updates: Partial<typeof employeeTransportAssignments.$inferInsert> = {
@@ -1403,6 +1389,8 @@ transportRoutesHandler.put("/assignments/:id", async (c) => {
     if (parsed.data.routeId !== undefined) updates.routeId = parsed.data.routeId;
     if (parsed.data.vehicleId !== undefined) updates.vehicleId = parsed.data.vehicleId || null;
     if (parsed.data.pickupPoint !== undefined) updates.pickupPoint = parsed.data.pickupPoint || null;
+    if (parsed.data.accommodation !== undefined) updates.accommodation = parsed.data.accommodation || null;
+    if (parsed.data.shift !== undefined) updates.shift = parsed.data.shift;
     if (parsed.data.effectiveFrom !== undefined) updates.effectiveFrom = parsed.data.effectiveFrom;
     if (parsed.data.effectiveTo !== undefined) updates.effectiveTo = parsed.data.effectiveTo || null;
     if (parsed.data.status !== undefined) updates.status = parsed.data.status;
@@ -1430,7 +1418,7 @@ transportRoutesHandler.put("/assignments/:id", async (c) => {
   }
 });
 
-transportRoutesHandler.post("/assignments/:id/end", async (c) => {
+transportRoutesHandler.post("/assignments/:id/end", requirePermissionMiddleware(PERMISSIONS.TRANSPORT_MANAGE), async (c) => {
   try {
     const id = c.req.param("id");
     const body = await c.req.json().catch(() => null);
@@ -1537,5 +1525,134 @@ transportRoutesHandler.delete("/assignments/:id", requireRole(ROLES.ADMIN), asyn
   } catch (error: any) {
     return jsonError(c, "INTERNAL_ERROR", error.message || "Failed to delete assignment", 500);
   }
+});
+
+// ==========================================
+// 6. ROUTE STOPS & DAILY TRIPS
+// ==========================================
+
+transportRoutesHandler.get("/routes/:routeId/stops", requirePermissionMiddleware(PERMISSIONS.TRANSPORT_READ), async (c) => {
+  const db = getDb(c.env.DB);
+  const rows = await db.select().from(transportRouteStops)
+    .where(eq(transportRouteStops.routeId, c.req.param("routeId")))
+    .orderBy(asc(transportRouteStops.sequence));
+  return jsonSuccess(c, rows);
+});
+
+transportRoutesHandler.post("/routes/:routeId/stops", requirePermissionMiddleware(PERMISSIONS.TRANSPORT_MANAGE), async (c) => {
+  try {
+    const parsed = createRouteStopSchema.safeParse(await c.req.json().catch(() => null));
+    if (!parsed.success) return jsonError(c, "VALIDATION_ERROR", "Invalid route stop data", 400, parsed.error.flatten());
+    const db = getDb(c.env.DB);
+    const routeId = c.req.param("routeId");
+    const route = await db.select({ id: transportRoutes.id }).from(transportRoutes).where(eq(transportRoutes.id, routeId)).limit(1);
+    if (!route.length) return jsonError(c, "NOT_FOUND", "Route not found", 404);
+    const now = new Date().toISOString();
+    const stop = { id: `stop_${crypto.randomUUID().replace(/-/g, "").slice(0, 12)}`, routeId, ...parsed.data, pickupTime: parsed.data.pickupTime || null, dropoffTime: parsed.data.dropoffTime || null, createdAt: now, updatedAt: now };
+    await db.insert(transportRouteStops).values(stop);
+    return jsonSuccess(c, stop, 201);
+  } catch (error: any) {
+    return jsonError(c, "INTERNAL_ERROR", error.message || "Failed to create route stop", 500);
+  }
+});
+
+transportRoutesHandler.put("/route-stops/:id", requirePermissionMiddleware(PERMISSIONS.TRANSPORT_MANAGE), async (c) => {
+  const parsed = updateRouteStopSchema.safeParse(await c.req.json().catch(() => null));
+  if (!parsed.success) return jsonError(c, "VALIDATION_ERROR", "Invalid route stop data", 400, parsed.error.flatten());
+  const db = getDb(c.env.DB);
+  const id = c.req.param("id");
+  const existing = await db.select().from(transportRouteStops).where(eq(transportRouteStops.id, id)).limit(1);
+  if (!existing.length) return jsonError(c, "NOT_FOUND", "Route stop not found", 404);
+  await db.update(transportRouteStops).set({ ...parsed.data, pickupTime: parsed.data.pickupTime || null, dropoffTime: parsed.data.dropoffTime || null, updatedAt: new Date().toISOString() }).where(eq(transportRouteStops.id, id));
+  const updated = await db.select().from(transportRouteStops).where(eq(transportRouteStops.id, id)).limit(1);
+  return jsonSuccess(c, updated[0]);
+});
+
+transportRoutesHandler.delete("/route-stops/:id", requirePermissionMiddleware(PERMISSIONS.TRANSPORT_MANAGE), async (c) => {
+  const db = getDb(c.env.DB);
+  const id = c.req.param("id");
+  const existing = await db.select({ id: transportRouteStops.id }).from(transportRouteStops).where(eq(transportRouteStops.id, id)).limit(1);
+  if (!existing.length) return jsonError(c, "NOT_FOUND", "Route stop not found", 404);
+  await db.delete(transportRouteStops).where(eq(transportRouteStops.id, id));
+  return jsonSuccess(c, { deleted: true, id });
+});
+
+transportRoutesHandler.get("/trips", requirePermissionMiddleware(PERMISSIONS.TRANSPORT_READ), async (c) => {
+  const db = getDb(c.env.DB);
+  const serviceDate = c.req.query("serviceDate");
+  const conditions = serviceDate ? [eq(transportTrips.serviceDate, serviceDate)] : [];
+  const rows = await db.select({
+    trip: transportTrips,
+    route: { id: transportRoutes.id, name: transportRoutes.name, code: transportRoutes.code },
+    vehicle: { id: transportVehicles.id, registrationNumber: transportVehicles.registrationNumber, vehicleType: transportVehicles.vehicleType },
+    passengerCount: sql<number>`(SELECT count(*) FROM transport_trip_passengers WHERE transport_trip_passengers.trip_id = ${transportTrips.id})`,
+    boardedCount: sql<number>`(SELECT count(*) FROM transport_trip_passengers WHERE transport_trip_passengers.trip_id = ${transportTrips.id} AND transport_trip_passengers.boarding_status = 'boarded')`,
+  }).from(transportTrips)
+    .leftJoin(transportRoutes, eq(transportTrips.routeId, transportRoutes.id))
+    .leftJoin(transportVehicles, eq(transportTrips.vehicleId, transportVehicles.id))
+    .where(conditions.length ? and(...conditions) : undefined)
+    .orderBy(desc(transportTrips.serviceDate), asc(transportTrips.shift));
+  return jsonSuccess(c, rows.map((row) => ({ ...row.trip, route: row.route, vehicle: row.vehicle?.id ? row.vehicle : null, passengerCount: Number(row.passengerCount || 0), boardedCount: Number(row.boardedCount || 0) })));
+});
+
+transportRoutesHandler.post("/trips", requirePermissionMiddleware(PERMISSIONS.TRANSPORT_MANAGE), async (c) => {
+  try {
+    const parsed = createTransportTripSchema.safeParse(await c.req.json().catch(() => null));
+    if (!parsed.success) return jsonError(c, "VALIDATION_ERROR", "Invalid transport trip data", 400, parsed.error.flatten());
+    const db = getDb(c.env.DB);
+    const data = parsed.data;
+    const route = await db.select().from(transportRoutes).where(eq(transportRoutes.id, data.routeId)).limit(1);
+    if (!route.length || route[0].status !== "active") return jsonError(c, "ROUTE_INACTIVE", "Route must be active", 400);
+    let vehicle: typeof transportVehicles.$inferSelect | undefined;
+    if (data.vehicleId) {
+      vehicle = (await db.select().from(transportVehicles).where(eq(transportVehicles.id, data.vehicleId)).limit(1))[0];
+      if (!vehicle || vehicle.status !== "active") return jsonError(c, "VEHICLE_INACTIVE", "Vehicle must be active", 400);
+    }
+    const assignments = await db.select().from(employeeTransportAssignments).where(and(
+      eq(employeeTransportAssignments.routeId, data.routeId),
+      eq(employeeTransportAssignments.shift, data.shift),
+      eq(employeeTransportAssignments.status, "active"),
+      sql`${employeeTransportAssignments.effectiveFrom} <= ${data.serviceDate}`,
+      or(sql`${employeeTransportAssignments.effectiveTo} IS NULL`, sql`${employeeTransportAssignments.effectiveTo} >= ${data.serviceDate}`)
+    ));
+    if (vehicle && assignments.length > vehicle.capacity) return jsonError(c, "VEHICLE_CAPACITY_EXCEEDED", "Vehicle capacity is lower than the assigned labour roster", 409);
+    const duplicate = await db.select({ id: transportTrips.id }).from(transportTrips).where(and(eq(transportTrips.routeId, data.routeId), eq(transportTrips.serviceDate, data.serviceDate), eq(transportTrips.shift, data.shift), eq(transportTrips.direction, data.direction))).limit(1);
+    if (duplicate.length) return jsonError(c, "TRIP_EXISTS", "A trip already exists for this route, date, shift, and direction", 409);
+    const now = new Date().toISOString();
+    const trip = { id: `trip_${crypto.randomUUID().replace(/-/g, "").slice(0, 12)}`, routeId: data.routeId, vehicleId: data.vehicleId || null, serviceDate: data.serviceDate, shift: data.shift, direction: data.direction, driverName: vehicle?.driverName || null, driverPhone: vehicle?.driverPhone || null, status: "planned", notes: data.notes || null, createdAt: now, updatedAt: now } as const;
+    await db.insert(transportTrips).values(trip);
+    if (assignments.length) {
+      await db.insert(transportTripPassengers).values(assignments.map((assignment) => ({ id: `pass_${crypto.randomUUID().replace(/-/g, "").slice(0, 12)}`, tripId: trip.id, employeeId: assignment.employeeId, assignmentId: assignment.id, boardingStatus: "planned" as const, boardedAt: null, notes: null, createdAt: now, updatedAt: now })));
+    }
+    return jsonSuccess(c, { ...trip, passengerCount: assignments.length }, 201);
+  } catch (error: any) {
+    return jsonError(c, "INTERNAL_ERROR", error.message || "Failed to create transport trip", 500);
+  }
+});
+
+transportRoutesHandler.get("/trips/:id/passengers", requirePermissionMiddleware(PERMISSIONS.TRANSPORT_READ), async (c) => {
+  const db = getDb(c.env.DB);
+  const rows = await db.select({ passenger: transportTripPassengers, employee: { id: employees.id, employeeCode: employees.employeeCode, fullName: employees.fullName } }).from(transportTripPassengers).leftJoin(employees, eq(transportTripPassengers.employeeId, employees.id)).where(eq(transportTripPassengers.tripId, c.req.param("id"))).orderBy(asc(employees.fullName));
+  return jsonSuccess(c, rows.map((row) => ({ ...row.passenger, employee: row.employee })));
+});
+
+transportRoutesHandler.patch("/trips/:tripId/passengers/:passengerId", requirePermissionMiddleware(PERMISSIONS.TRANSPORT_MANAGE), async (c) => {
+  const parsed = updateBoardingStatusSchema.safeParse(await c.req.json().catch(() => null));
+  if (!parsed.success) return jsonError(c, "VALIDATION_ERROR", "Invalid boarding status", 400, parsed.error.flatten());
+  const db = getDb(c.env.DB);
+  const passenger = await db.select().from(transportTripPassengers).where(and(eq(transportTripPassengers.id, c.req.param("passengerId")), eq(transportTripPassengers.tripId, c.req.param("tripId")))).limit(1);
+  if (!passenger.length) return jsonError(c, "NOT_FOUND", "Trip passenger not found", 404);
+  await db.update(transportTripPassengers).set({ ...parsed.data, boardedAt: parsed.data.boardingStatus === "boarded" ? new Date().toISOString() : null, updatedAt: new Date().toISOString() }).where(eq(transportTripPassengers.id, c.req.param("passengerId")));
+  return jsonSuccess(c, { id: c.req.param("passengerId"), ...parsed.data });
+});
+
+transportRoutesHandler.patch("/trips/:id/status", requirePermissionMiddleware(PERMISSIONS.TRANSPORT_MANAGE), async (c) => {
+  const parsed = updateTripStatusSchema.safeParse(await c.req.json().catch(() => null));
+  if (!parsed.success) return jsonError(c, "VALIDATION_ERROR", "Invalid trip status", 400, parsed.error.flatten());
+  const db = getDb(c.env.DB);
+  const existing = await db.select().from(transportTrips).where(eq(transportTrips.id, c.req.param("id"))).limit(1);
+  if (!existing.length) return jsonError(c, "NOT_FOUND", "Transport trip not found", 404);
+  await db.update(transportTrips).set({ status: parsed.data.status, notes: parsed.data.notes ?? existing[0].notes, updatedAt: new Date().toISOString() }).where(eq(transportTrips.id, c.req.param("id")));
+  return jsonSuccess(c, { ...existing[0], ...parsed.data });
 });
 

@@ -1,5 +1,9 @@
 export type TransportStatus = "active" | "inactive";
 export type AssignmentStatus = "active" | "ended" | "cancelled";
+export type TransportShift = string;
+export type TripDirection = "PICKUP" | "DROPOFF";
+export type TripStatus = "planned" | "ready" | "in_progress" | "completed" | "cancelled";
+export type BoardingStatus = "planned" | "boarded" | "absent" | "replaced";
 
 export interface TransportRoute {
   id: string;
@@ -18,6 +22,18 @@ export interface TransportRoute {
     city?: string | null;
   } | null;
   activeAssignmentsCount?: number;
+  stops?: TransportRouteStop[];
+}
+
+export interface TransportRouteStop {
+  id: string;
+  routeId: string;
+  sequence: number;
+  name: string;
+  location: string;
+  pickupTime: string | null;
+  dropoffTime: string | null;
+  status: "active" | "inactive";
 }
 
 export interface TransportVehicle {
@@ -39,6 +55,8 @@ export interface TransportAssignment {
   routeId: string;
   vehicleId: string | null;
   pickupPoint: string | null;
+  accommodation: string | null;
+  shift: TransportShift;
   effectiveFrom: string;
   effectiveTo: string | null;
   status: AssignmentStatus;
@@ -79,4 +97,32 @@ export interface TransportOverview {
   totalVehicleCapacity: number;
   availableCapacity: number;
   recentAssignments: TransportAssignment[];
+}
+
+export interface TransportTrip {
+  id: string;
+  routeId: string;
+  vehicleId: string | null;
+  serviceDate: string;
+  shift: TransportShift;
+  direction: TripDirection;
+  driverName: string | null;
+  driverPhone: string | null;
+  status: TripStatus;
+  notes: string | null;
+  passengerCount?: number;
+  boardedCount?: number;
+  route?: Pick<TransportRoute, "id" | "name" | "code">;
+  vehicle?: Pick<TransportVehicle, "id" | "registrationNumber" | "vehicleType"> | null;
+}
+
+export interface TransportTripPassenger {
+  id: string;
+  tripId: string;
+  employeeId: string;
+  assignmentId: string | null;
+  boardingStatus: BoardingStatus;
+  boardedAt: string | null;
+  notes: string | null;
+  employee?: Pick<TransportAssignment["employee"] extends infer T ? NonNullable<T> : never, "id" | "employeeCode" | "fullName">;
 }

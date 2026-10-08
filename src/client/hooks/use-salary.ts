@@ -16,7 +16,7 @@ export function useSalaryStructures(status?: string) {
     queryKey: salaryKeys.structures(status),
     queryFn: async () => {
       const query = status ? `?status=${encodeURIComponent(status)}` : "";
-      const res = await apiClient.get<SalaryStructure[]>(`/api/salary/structures${query}`);
+      const res = await apiClient.get<SalaryStructure[]>(`/salary/structures${query}`);
       return res || [];
     },
   });
@@ -27,7 +27,7 @@ export function useSalaryStructure(id: string | null) {
     queryKey: salaryKeys.structure(id || ""),
     queryFn: async () => {
       if (!id) return null;
-      const res = await apiClient.get<SalaryStructure>(`/api/salary/structures/${id}`);
+      const res = await apiClient.get<SalaryStructure>(`/salary/structures/${id}`);
       return res || null;
     },
     enabled: Boolean(id),
@@ -49,7 +49,7 @@ export function useCreateSalaryStructure() {
       currency?: string;
       status?: "active" | "inactive";
     }) => {
-      const res = await apiClient.post<SalaryStructure>("/api/salary/structures", payload);
+      const res = await apiClient.post<SalaryStructure>("/salary/structures", payload);
       return res;
     },
     onSuccess: () => {
@@ -76,7 +76,7 @@ export function useUpdateSalaryStructure() {
       currency?: string;
       status?: "active" | "inactive";
     }) => {
-      const res = await apiClient.put<SalaryStructure>(`/api/salary/structures/${id}`, payload);
+      const res = await apiClient.put<SalaryStructure>(`/salary/structures/${id}`, payload);
       return res;
     },
     onSuccess: (_, vars) => {
@@ -91,7 +91,7 @@ export function useDeactivateSalaryStructure() {
   return useMutation({
     mutationFn: async (id: string) => {
       const res = await apiClient.post<{ message: string; id: string }>(
-        `/api/salary/structures/${id}/deactivate`,
+        `/salary/structures/${id}/deactivate`,
         {}
       );
       return res;
@@ -107,7 +107,7 @@ export function useActivateSalaryStructure() {
   return useMutation({
     mutationFn: async (id: string) => {
       const res = await apiClient.post<{ message: string; id: string }>(
-        `/api/salary/structures/${id}/activate`,
+        `/salary/structures/${id}/activate`,
         {}
       );
       return res;
@@ -123,7 +123,7 @@ export function useDeleteSalaryStructure() {
   return useMutation({
     mutationFn: async (id: string) => {
       const res = await apiClient.delete<{ message: string; id: string }>(
-        `/api/salary/structures/${id}`
+        `/salary/structures/${id}`
       );
       return res;
     },
@@ -137,7 +137,7 @@ export function useEmployeeSalaries() {
   return useQuery({
     queryKey: salaryKeys.employeeSalaries(),
     queryFn: async () => {
-      const res = await apiClient.get<EmployeeSalary[]>("/api/salary/employees");
+      const res = await apiClient.get<EmployeeSalary[]>("/salary/employees");
       return res || [];
     },
   });
@@ -149,7 +149,7 @@ export function useEmployeeCurrentSalary(employeeId: string | null) {
     queryFn: async () => {
       if (!employeeId) return null;
       const res = await apiClient.get<EmployeeSalary | null>(
-        `/api/salary/employees/${employeeId}/current`
+        `/salary/employees/${employeeId}/current`
       );
       return res || null;
     },
@@ -163,7 +163,7 @@ export function useEmployeeSalaryHistory(employeeId: string | null) {
     queryFn: async () => {
       if (!employeeId) return [];
       const res = await apiClient.get<EmployeeSalary[]>(
-        `/api/salary/employees/${employeeId}/history`
+        `/salary/employees/${employeeId}/history`
       );
       return res || [];
     },
@@ -187,7 +187,7 @@ export function useAssignEmployeeSalary() {
       effectiveTo?: string | null;
       notes?: string | null;
     }) => {
-      const res = await apiClient.post<EmployeeSalary>("/api/salary/employees/assign", payload);
+      const res = await apiClient.post<EmployeeSalary>("/salary/employees/assign", payload);
       return res;
     },
     onSuccess: (_, vars) => {

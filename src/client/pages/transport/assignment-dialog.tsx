@@ -55,6 +55,8 @@ export const AssignmentDialog: React.FC<AssignmentDialogProps> = ({
   const [routeId, setRouteId] = useState("");
   const [vehicleId, setVehicleId] = useState("");
   const [pickupPoint, setPickupPoint] = useState("");
+  const [accommodation, setAccommodation] = useState("");
+  const [shift, setShift] = useState("GENERAL");
   const [effectiveFrom, setEffectiveFrom] = useState(todayStr);
   const [effectiveTo, setEffectiveTo] = useState("");
   const [notes, setNotes] = useState("");
@@ -66,6 +68,8 @@ export const AssignmentDialog: React.FC<AssignmentDialogProps> = ({
       setRouteId(assignmentToEdit.routeId);
       setVehicleId(assignmentToEdit.vehicleId || "");
       setPickupPoint(assignmentToEdit.pickupPoint || "");
+      setAccommodation(assignmentToEdit.accommodation || "");
+      setShift(assignmentToEdit.shift || "GENERAL");
       setEffectiveFrom(assignmentToEdit.effectiveFrom);
       setEffectiveTo(assignmentToEdit.effectiveTo || "");
       setNotes(assignmentToEdit.notes || "");
@@ -74,6 +78,8 @@ export const AssignmentDialog: React.FC<AssignmentDialogProps> = ({
       setRouteId(routes[0]?.id || "");
       setVehicleId("");
       setPickupPoint("");
+      setAccommodation("");
+      setShift("GENERAL");
       setEffectiveFrom(todayStr);
       setEffectiveTo("");
       setNotes("");
@@ -114,6 +120,8 @@ export const AssignmentDialog: React.FC<AssignmentDialogProps> = ({
             routeId,
             vehicleId: vehicleId || null,
             pickupPoint: pickupPoint.trim() || null,
+            accommodation: accommodation.trim() || null,
+            shift,
             effectiveFrom,
             effectiveTo: effectiveTo || null,
             notes: notes.trim() || null,
@@ -125,6 +133,8 @@ export const AssignmentDialog: React.FC<AssignmentDialogProps> = ({
           routeId,
           vehicleId: vehicleId || null,
           pickupPoint: pickupPoint.trim() || null,
+          accommodation: accommodation.trim() || null,
+          shift,
           effectiveFrom,
           effectiveTo: effectiveTo || null,
           notes: notes.trim() || null,
@@ -247,6 +257,26 @@ export const AssignmentDialog: React.FC<AssignmentDialogProps> = ({
               value={pickupPoint}
               onChange={(e) => setPickupPoint(e.target.value)}
             />
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-1.5">
+              <Label htmlFor="accommodation">Labour Accommodation / Camp</Label>
+              <Input
+                id="accommodation"
+                placeholder="e.g. Sonapur Camp 4"
+                value={accommodation}
+                onChange={(e) => setAccommodation(e.target.value)}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="shift">Work Shift</Label>
+              <Select id="shift" value={shift} onChange={(e) => setShift(e.target.value)}>
+                <option value="GENERAL">General</option>
+                <option value="DAY">Day Shift</option>
+                <option value="NIGHT">Night Shift</option>
+              </Select>
+            </div>
           </div>
 
           {/* Dates */}

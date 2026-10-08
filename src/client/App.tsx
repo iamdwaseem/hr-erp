@@ -15,6 +15,8 @@ import { SalaryPage } from "./pages/salary";
 import { PayrollPage } from "./pages/payroll";
 import { GratuityPage } from "./pages/gratuity";
 import { PayslipsPage } from "./pages/payslips";
+import { AttendancePage } from "./pages/attendance";
+import { LeavePage } from "./pages/leave";
 import { NotFoundPage } from "./pages/not-found";
 import { AppLayout } from "./components/layout/app-layout";
 import { ProtectedRoute } from "./components/layout/protected-route";
@@ -125,6 +127,24 @@ const AppContent: React.FC = () => {
           component: (
             <ProtectedRoute requiredPermission={PERMISSIONS.TRANSPORT_READ}>
               <TransportPage onViewEmployee={handleViewEmployee} />
+            </ProtectedRoute>
+          ),
+        };
+      case "/attendance":
+        return {
+          title: "Attendance Import",
+          component: (
+            <ProtectedRoute requiredPermission={PERMISSIONS.ATTENDANCE_READ}>
+              <AttendancePage />
+            </ProtectedRoute>
+          ),
+        };
+      case "/leave":
+        return {
+          title: "Leave Management",
+          component: (
+            <ProtectedRoute requiredPermission={PERMISSIONS.LEAVE_READ}>
+              <LeavePage />
             </ProtectedRoute>
           ),
         };

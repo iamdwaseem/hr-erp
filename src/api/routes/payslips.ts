@@ -2,8 +2,8 @@ import { Hono } from "hono";
 import { desc, eq, and } from "drizzle-orm";
 import type { AppContext } from "../types";
 import { requireAuth } from "../middleware/auth";
-import { requireRole } from "../middleware/rbac";
-import { ROLES } from "../../shared/constants/roles";
+import { requirePermissionMiddleware } from "../middleware/rbac";
+import { PERMISSIONS } from "../../shared/constants/roles";
 import { getDb } from "../db/client";
 import {
   payslips,
@@ -21,7 +21,6 @@ import { generatePayslipsSchema } from "../../shared/schemas/payroll";
 export const payslipsRoutes = new Hono<AppContext>();
 
 payslipsRoutes.use("*", requireAuth());
-payslipsRoutes.use("*", requireRole(ROLES.ADMIN, ROLES.HR));
 
 // Helper for audit logging
 async function logPayslipAudit(
@@ -63,7 +62,7 @@ async function logPayslipAudit(
  * GET /api/payslips
  * List all payslips with filters
  */
-payslipsRoutes.get("/", async (c) => {
+payslipsRoutes.get("/", requirePermissionMiddleware(PERMISSIONS.PAYSLIP_READ), async (c) => {
   try {
     const db = getDb(c.env.DB);
     const periodId = c.req.query("periodId");
@@ -124,7 +123,7 @@ payslipsRoutes.get("/", async (c) => {
  * POST /api/payslips/generate
  * Bulk generate payslips for a payroll period
  */
-payslipsRoutes.post("/generate", async (c) => {
+payslipsRoutes.post("/generate", requirePermissionMiddleware(PERMISSIONS.PAYSLIP_MANAGE), async (c) => {
   try {
     const body = await c.req.json();
     const parsed = generatePayslipsSchema.safeParse(body);
@@ -147,6 +146,10 @@ payslipsRoutes.post("/generate", async (c) => {
     }
 
     const period = periodRows[0];
+
+    if (period.status !== "approved" && period.status !== "paid") {
+      return jsonError(c, "INVALID_PERIOD_STATUS", "Payslips can only be generated for approved or paid payroll periods", 400);
+    }
 
     // Fetch payroll records for this period
     const records = await db
@@ -222,7 +225,7 @@ payslipsRoutes.post("/generate", async (c) => {
  * GET /api/payslips/:id
  * Retrieve detailed payslip snapshot for viewing or printing
  */
-payslipsRoutes.get("/:id", async (c) => {
+payslipsRoutes.get("/:id", requirePermissionMiddleware(PERMISSIONS.PAYSLIP_READ), async (c) => {
   try {
     const id = c.req.param("id");
     const db = getDb(c.env.DB);
@@ -296,7 +299,7 @@ payslipsRoutes.get("/:id", async (c) => {
 /**
  * GET /api/payslips/employee/:employeeId
  */
-payslipsRoutes.get("/employee/:employeeId", async (c) => {
+payslipsRoutes.get("/employee/:employeeId", requirePermissionMiddleware(PERMISSIONS.PAYSLIP_READ), async (c) => {
   try {
     const employeeId = c.req.param("employeeId");
     const db = getDb(c.env.DB);

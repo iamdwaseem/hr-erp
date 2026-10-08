@@ -2,8 +2,8 @@ import { Hono } from "hono";
 import { desc, eq, and } from "drizzle-orm";
 import type { AppContext } from "../types";
 import { requireAuth } from "../middleware/auth";
-import { requireRole } from "../middleware/rbac";
-import { ROLES } from "../../shared/constants/roles";
+import { requirePermissionMiddleware } from "../middleware/rbac";
+import { PERMISSIONS } from "../../shared/constants/roles";
 import { getDb } from "../db/client";
 import { gratuityRecords, employeeSalaries } from "../db/schema/payroll";
 import { employees } from "../db/schema/employees";
@@ -23,7 +23,6 @@ import {
 export const gratuityRoutes = new Hono<AppContext>();
 
 gratuityRoutes.use("*", requireAuth());
-gratuityRoutes.use("*", requireRole(ROLES.ADMIN, ROLES.HR));
 
 // Helper for audit logging
 async function logGratuityAudit(
@@ -65,7 +64,7 @@ async function logGratuityAudit(
  * POST /api/gratuity/calculate
  * Calculate/preview gratuity for an employee
  */
-gratuityRoutes.post("/calculate", async (c) => {
+gratuityRoutes.post("/calculate", requirePermissionMiddleware(PERMISSIONS.GRATUITY_READ), async (c) => {
   try {
     const body = await c.req.json();
     const parsed = calculateGratuityRequestSchema.safeParse(body);
@@ -147,7 +146,7 @@ gratuityRoutes.post("/calculate", async (c) => {
  * POST /api/gratuity/records
  * Save/finalize gratuity calculation record
  */
-gratuityRoutes.post("/records", async (c) => {
+gratuityRoutes.post("/records", requirePermissionMiddleware(PERMISSIONS.GRATUITY_MANAGE), async (c) => {
   try {
     const body = await c.req.json();
     const parsed = saveGratuityRecordSchema.safeParse(body);
@@ -169,6 +168,23 @@ gratuityRoutes.post("/records", async (c) => {
     }
 
     const emp = empRows[0];
+    if (data.lastWorkingDate < emp.joiningDate) {
+      return jsonError(c, "INVALID_DATE_RANGE", "Last working date cannot be before joining date", 400);
+    }
+    const calculation = calculateUAEGratuity({
+      basicSalaryFils: toMinorUnits(data.basicSalaryAtCalculation),
+      joiningDate: emp.joiningDate,
+      lastWorkingDate: data.lastWorkingDate,
+      policyVersion: data.policyVersion || "uae_standard_v1",
+    });
+
+    if (
+      data.serviceYears !== calculation.serviceYearsBasisPoints ||
+      data.eligibleDays !== calculation.eligibleDays ||
+      toMinorUnits(data.gratuityAmount) !== calculation.gratuityAmountFils
+    ) {
+      return jsonError(c, "CALCULATION_MISMATCH", "Saved gratuity values do not match the server calculation", 400);
+    }
     const id = `grt_${crypto.randomUUID().replace(/-/g, "").slice(0, 12)}`;
     const now = new Date().toISOString();
 
@@ -208,7 +224,7 @@ gratuityRoutes.post("/records", async (c) => {
  * GET /api/gratuity/records
  * List all saved gratuity records
  */
-gratuityRoutes.get("/records", async (c) => {
+gratuityRoutes.get("/records", requirePermissionMiddleware(PERMISSIONS.GRATUITY_READ), async (c) => {
   try {
     const db = getDb(c.env.DB);
 
@@ -250,7 +266,7 @@ gratuityRoutes.get("/records", async (c) => {
  * GET /api/gratuity/employees/:employeeId
  * List gratuity records for a single employee
  */
-gratuityRoutes.get("/employees/:employeeId", async (c) => {
+gratuityRoutes.get("/employees/:employeeId", requirePermissionMiddleware(PERMISSIONS.GRATUITY_READ), async (c) => {
   try {
     const employeeId = c.req.param("employeeId");
     const db = getDb(c.env.DB);

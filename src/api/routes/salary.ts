@@ -2,8 +2,8 @@ import { Hono } from "hono";
 import { asc, desc, eq, and, sql } from "drizzle-orm";
 import type { AppContext } from "../types";
 import { requireAuth } from "../middleware/auth";
-import { requireRole } from "../middleware/rbac";
-import { ROLES } from "../../shared/constants/roles";
+import { requirePermissionMiddleware } from "../middleware/rbac";
+import { PERMISSIONS, ROLES } from "../../shared/constants/roles";
 import { getDb } from "../db/client";
 import { salaryStructures, employeeSalaries } from "../db/schema/payroll";
 import { employees } from "../db/schema/employees";
@@ -23,7 +23,6 @@ import {
 export const salaryRoutes = new Hono<AppContext>();
 
 salaryRoutes.use("*", requireAuth());
-salaryRoutes.use("*", requireRole(ROLES.ADMIN, ROLES.HR));
 
 // Helper for audit logging
 async function logSalaryAudit(
@@ -69,7 +68,7 @@ async function logSalaryAudit(
  * GET /api/salary/structures
  * List salary structures
  */
-salaryRoutes.get("/structures", async (c) => {
+salaryRoutes.get("/structures", requirePermissionMiddleware(PERMISSIONS.SALARY_READ), async (c) => {
   try {
     const db = getDb(c.env.DB);
     const status = c.req.query("status");
@@ -90,7 +89,7 @@ salaryRoutes.get("/structures", async (c) => {
  * POST /api/salary/structures
  * Create new salary structure
  */
-salaryRoutes.post("/structures", async (c) => {
+salaryRoutes.post("/structures", requirePermissionMiddleware(PERMISSIONS.SALARY_MANAGE), async (c) => {
   try {
     const body = await c.req.json();
     const parsed = createSalaryStructureSchema.safeParse(body);
@@ -146,7 +145,7 @@ salaryRoutes.post("/structures", async (c) => {
 /**
  * GET /api/salary/structures/:id
  */
-salaryRoutes.get("/structures/:id", async (c) => {
+salaryRoutes.get("/structures/:id", requirePermissionMiddleware(PERMISSIONS.SALARY_READ), async (c) => {
   try {
     const id = c.req.param("id");
     const db = getDb(c.env.DB);
@@ -170,7 +169,7 @@ salaryRoutes.get("/structures/:id", async (c) => {
 /**
  * PUT /api/salary/structures/:id
  */
-salaryRoutes.put("/structures/:id", async (c) => {
+salaryRoutes.put("/structures/:id", requirePermissionMiddleware(PERMISSIONS.SALARY_MANAGE), async (c) => {
   try {
     const id = c.req.param("id");
     const body = await c.req.json();
@@ -223,7 +222,7 @@ salaryRoutes.put("/structures/:id", async (c) => {
 /**
  * POST /api/salary/structures/:id/deactivate
  */
-salaryRoutes.post("/structures/:id/deactivate", async (c) => {
+salaryRoutes.post("/structures/:id/deactivate", requirePermissionMiddleware(PERMISSIONS.SALARY_MANAGE), async (c) => {
   try {
     const id = c.req.param("id");
     const db = getDb(c.env.DB);
@@ -253,7 +252,7 @@ salaryRoutes.post("/structures/:id/deactivate", async (c) => {
 /**
  * POST /api/salary/structures/:id/activate
  */
-salaryRoutes.post("/structures/:id/activate", async (c) => {
+salaryRoutes.post("/structures/:id/activate", requirePermissionMiddleware(PERMISSIONS.SALARY_MANAGE), async (c) => {
   try {
     const id = c.req.param("id");
     const db = getDb(c.env.DB);
@@ -284,7 +283,7 @@ salaryRoutes.post("/structures/:id/activate", async (c) => {
  * DELETE /api/salary/structures/:id
  * ADMIN & HR safe delete: reject if historical employee salary assignments reference it
  */
-salaryRoutes.delete("/structures/:id", async (c) => {
+salaryRoutes.delete("/structures/:id", requirePermissionMiddleware(PERMISSIONS.SALARY_MANAGE), async (c) => {
   try {
     const id = c.req.param("id");
     const user = c.get("user")!;
@@ -345,7 +344,7 @@ salaryRoutes.delete("/structures/:id", async (c) => {
  * GET /api/salary/employees
  * List all current employee salary records overview
  */
-salaryRoutes.get("/employees", async (c) => {
+salaryRoutes.get("/employees", requirePermissionMiddleware(PERMISSIONS.SALARY_READ), async (c) => {
   try {
     const db = getDb(c.env.DB);
 
@@ -388,7 +387,7 @@ salaryRoutes.get("/employees", async (c) => {
  * GET /api/salary/employees/:employeeId/current
  * Get current active salary record for employee
  */
-salaryRoutes.get("/employees/:employeeId/current", async (c) => {
+salaryRoutes.get("/employees/:employeeId/current", requirePermissionMiddleware(PERMISSIONS.SALARY_READ), async (c) => {
   try {
     const employeeId = c.req.param("employeeId");
     const db = getDb(c.env.DB);
@@ -439,7 +438,7 @@ salaryRoutes.get("/employees/:employeeId/current", async (c) => {
  * GET /api/salary/employees/:employeeId/history
  * Get chronological salary history for employee
  */
-salaryRoutes.get("/employees/:employeeId/history", async (c) => {
+salaryRoutes.get("/employees/:employeeId/history", requirePermissionMiddleware(PERMISSIONS.SALARY_READ), async (c) => {
   try {
     const employeeId = c.req.param("employeeId");
     const db = getDb(c.env.DB);
@@ -481,7 +480,7 @@ salaryRoutes.get("/employees/:employeeId/history", async (c) => {
  * Assign or update employee salary.
  * Preserves historical records: closes active record and creates a new one.
  */
-salaryRoutes.post("/employees/assign", async (c) => {
+salaryRoutes.post("/employees/assign", requirePermissionMiddleware(PERMISSIONS.SALARY_MANAGE), async (c) => {
   try {
     const body = await c.req.json();
     const parsed = assignEmployeeSalarySchema.safeParse(body);
@@ -501,6 +500,10 @@ salaryRoutes.post("/employees/assign", async (c) => {
 
     if (emp.length === 0) {
       return jsonError(c, "NOT_FOUND", "Employee not found", 404);
+    }
+
+    if (data.effectiveTo && data.effectiveTo < data.effectiveFrom) {
+      return jsonError(c, "VALIDATION_ERROR", "Effective to date cannot be before effective from date", 400);
     }
 
     // Convert to minor units (fils) and calculate authoritative totals
@@ -532,6 +535,12 @@ salaryRoutes.post("/employees/assign", async (c) => {
       );
 
     for (const rec of activeRecords) {
+      if (rec.effectiveFrom > data.effectiveFrom) {
+        return jsonError(c, "SALARY_DATE_OVERLAP", "A salary record already starts after the requested effective date", 409);
+      }
+      if (rec.effectiveTo && rec.effectiveTo < data.effectiveFrom) {
+        continue;
+      }
       await db
         .update(employeeSalaries)
         .set({

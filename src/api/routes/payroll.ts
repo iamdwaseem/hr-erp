@@ -1,9 +1,9 @@
 import { Hono } from "hono";
-import { asc, desc, eq, and, sql } from "drizzle-orm";
+import { asc, desc, eq, and, or, sql } from "drizzle-orm";
 import type { AppContext } from "../types";
 import { requireAuth } from "../middleware/auth";
-import { requireRole } from "../middleware/rbac";
-import { ROLES } from "../../shared/constants/roles";
+import { requirePermissionMiddleware } from "../middleware/rbac";
+import { PERMISSIONS } from "../../shared/constants/roles";
 import { getDb } from "../db/client";
 import {
   payrollPeriods,
@@ -12,6 +12,8 @@ import {
   employeeSalaries,
 } from "../db/schema/payroll";
 import { employees } from "../db/schema/employees";
+import { attendanceRecords } from "../db/schema/attendance";
+import { leaveTypes } from "../db/schema/leave";
 import { departments, designations } from "../db/schema/masters";
 import { users } from "../db/schema/users";
 import { auditLogs } from "../db/schema/audit";
@@ -28,7 +30,36 @@ import {
 export const payrollRoutes = new Hono<AppContext>();
 
 payrollRoutes.use("*", requireAuth());
-payrollRoutes.use("*", requireRole(ROLES.ADMIN, ROLES.HR));
+
+function countWeekdays(startDate: string, endDate: string) {
+  let count = 0;
+  const current = new Date(`${startDate}T00:00:00Z`);
+  const end = new Date(`${endDate}T00:00:00Z`);
+  while (current <= end) {
+    const day = current.getUTCDay();
+    if (day !== 0 && day !== 6) count++;
+    current.setUTCDate(current.getUTCDate() + 1);
+  }
+  return count;
+}
+
+async function getAttendanceDays(db: any, employeeId: string, startDate: string, endDate: string) {
+  const rows = await db
+    .select({ status: attendanceRecords.status, paid: leaveTypes.paid })
+    .from(attendanceRecords)
+    .leftJoin(leaveTypes, eq(attendanceRecords.leaveTypeId, leaveTypes.id))
+    .where(
+      and(
+        eq(attendanceRecords.employeeId, employeeId),
+        sql`${attendanceRecords.attendanceDate} >= ${startDate}`,
+        sql`${attendanceRecords.attendanceDate} <= ${endDate}`
+      )
+    );
+  const paidLeaveDays = rows.filter((row: any) => row.status === "leave" && row.paid === true).length;
+  const unpaidLeaveDays = rows.filter((row: any) => row.status === "leave" && row.paid === false).length;
+  const absentDays = rows.filter((row: any) => row.status === "absent").length;
+  return { paidLeaveDays, unpaidLeaveDays, absentDays };
+}
 
 // Helper for audit logging
 async function logPayrollAudit(
@@ -126,7 +157,7 @@ async function recalculatePayrollRecord(db: any, recordId: string) {
  * GET /api/payroll/periods
  * List all payroll periods with calculated financial aggregates
  */
-payrollRoutes.get("/periods", async (c) => {
+payrollRoutes.get("/periods", requirePermissionMiddleware(PERMISSIONS.PAYROLL_READ), async (c) => {
   try {
     const db = getDb(c.env.DB);
     const periods = await db
@@ -168,7 +199,7 @@ payrollRoutes.get("/periods", async (c) => {
  * POST /api/payroll/periods
  * Create new payroll period
  */
-payrollRoutes.post("/periods", async (c) => {
+payrollRoutes.post("/periods", requirePermissionMiddleware(PERMISSIONS.PAYROLL_MANAGE), async (c) => {
   try {
     const body = await c.req.json();
     const parsed = createPayrollPeriodSchema.safeParse(body);
@@ -230,7 +261,7 @@ payrollRoutes.post("/periods", async (c) => {
 /**
  * GET /api/payroll/periods/:id
  */
-payrollRoutes.get("/periods/:id", async (c) => {
+payrollRoutes.get("/periods/:id", requirePermissionMiddleware(PERMISSIONS.PAYROLL_READ), async (c) => {
   try {
     const id = c.req.param("id");
     const db = getDb(c.env.DB);
@@ -273,7 +304,7 @@ payrollRoutes.get("/periods/:id", async (c) => {
  * POST /api/payroll/periods/:id/generate
  * Generate authoritative payroll snapshot for all active employees
  */
-payrollRoutes.post("/periods/:id/generate", async (c) => {
+payrollRoutes.post("/periods/:id/generate", requirePermissionMiddleware(PERMISSIONS.PAYROLL_MANAGE), async (c) => {
   try {
     const id = c.req.param("id");
     const db = getDb(c.env.DB);
@@ -321,7 +352,12 @@ payrollRoutes.post("/periods/:id/generate", async (c) => {
         .where(
           and(
             eq(employeeSalaries.employeeId, emp.id),
-            sql`${employeeSalaries.effectiveFrom} <= ${period.endDate}`
+            eq(employeeSalaries.status, "active"),
+            sql`${employeeSalaries.effectiveFrom} <= ${period.endDate}`,
+            or(
+              sql`${employeeSalaries.effectiveTo} IS NULL`,
+              sql`${employeeSalaries.effectiveTo} >= ${period.startDate}`
+            )
           )
         )
         .orderBy(desc(employeeSalaries.effectiveFrom))
@@ -338,6 +374,9 @@ payrollRoutes.post("/periods/:id/generate", async (c) => {
       }
 
       const sal = salaryRows[0];
+      const workingDays = countWeekdays(period.startDate, period.endDate);
+      const attendanceDays = await getAttendanceDays(db, emp.id, period.startDate, period.endDate);
+      const payableDays = Math.max(0, workingDays - attendanceDays.unpaidLeaveDays - attendanceDays.absentDays);
 
       // Check if a payroll record already exists for this (period, employee)
       const existingRec = await db
@@ -366,6 +405,9 @@ payrollRoutes.post("/periods/:id/generate", async (c) => {
             totalDeductions: sal.deductions,
             netSalary: sal.netSalary,
             currency: sal.currency,
+            workingDays,
+            payableDays,
+            unpaidDays: attendanceDays.unpaidLeaveDays + attendanceDays.absentDays,
             updatedAt: now,
           })
           .where(eq(payrollRecords.id, existingRec[0].id));
@@ -388,9 +430,9 @@ payrollRoutes.post("/periods/:id/generate", async (c) => {
           gratuityAdjustment: 0,
           totalDeductions: sal.deductions,
           netSalary: sal.netSalary,
-          workingDays: 30,
-          payableDays: 30,
-          unpaidDays: 0,
+          workingDays,
+          payableDays,
+          unpaidDays: attendanceDays.unpaidLeaveDays + attendanceDays.absentDays,
           currency: sal.currency,
           status: "calculated",
           createdAt: now,
@@ -431,7 +473,7 @@ payrollRoutes.post("/periods/:id/generate", async (c) => {
  * GET /api/payroll/periods/:id/records
  * List employee payroll records for a period
  */
-payrollRoutes.get("/periods/:id/records", async (c) => {
+payrollRoutes.get("/periods/:id/records", requirePermissionMiddleware(PERMISSIONS.PAYROLL_READ), async (c) => {
   try {
     const id = c.req.param("id");
     const db = getDb(c.env.DB);
@@ -503,7 +545,7 @@ payrollRoutes.get("/periods/:id/records", async (c) => {
 /**
  * GET /api/payroll/records/:id
  */
-payrollRoutes.get("/records/:id", async (c) => {
+payrollRoutes.get("/records/:id", requirePermissionMiddleware(PERMISSIONS.PAYROLL_READ), async (c) => {
   try {
     const id = c.req.param("id");
     const db = getDb(c.env.DB);
@@ -564,7 +606,7 @@ payrollRoutes.get("/records/:id", async (c) => {
  * POST /api/payroll/records/:id/adjustments
  * Add earning or deduction to payroll record & recalculate
  */
-payrollRoutes.post("/records/:id/adjustments", async (c) => {
+payrollRoutes.post("/records/:id/adjustments", requirePermissionMiddleware(PERMISSIONS.PAYROLL_MANAGE), async (c) => {
   try {
     const recordId = c.req.param("id");
     const body = await c.req.json();
@@ -633,7 +675,7 @@ payrollRoutes.post("/records/:id/adjustments", async (c) => {
 /**
  * DELETE /api/payroll/adjustments/:id
  */
-payrollRoutes.delete("/adjustments/:id", async (c) => {
+payrollRoutes.delete("/adjustments/:id", requirePermissionMiddleware(PERMISSIONS.PAYROLL_MANAGE), async (c) => {
   try {
     const id = c.req.param("id");
     const db = getDb(c.env.DB);
@@ -686,7 +728,7 @@ payrollRoutes.delete("/adjustments/:id", async (c) => {
 /**
  * POST /api/payroll/periods/:id/process
  */
-payrollRoutes.post("/periods/:id/process", async (c) => {
+payrollRoutes.post("/periods/:id/process", requirePermissionMiddleware(PERMISSIONS.PAYROLL_MANAGE), async (c) => {
   try {
     const id = c.req.param("id");
     const db = getDb(c.env.DB);
@@ -703,7 +745,15 @@ payrollRoutes.post("/periods/:id/process", async (c) => {
 
     const period = periodRows[0];
     if (period.status === "approved" || period.status === "paid") {
-      return jsonError(c, "PERIOD_LOCKED", `Payroll is already ${period.status}`, 400);
+      return jsonError(c, "INVALID_TRANSITION", `Cannot process payroll after approval; current status is '${period.status}'`, 400);
+    }
+
+    const recordCount = await db
+      .select({ count: sql<number>`count(*)` })
+      .from(payrollRecords)
+      .where(eq(payrollRecords.payrollPeriodId, id));
+    if (Number(recordCount[0]?.count ?? 0) === 0) {
+      return jsonError(c, "NO_PAYROLL_RECORDS", "Generate payroll records before processing this period", 400);
     }
 
     const now = new Date().toISOString();
@@ -722,7 +772,7 @@ payrollRoutes.post("/periods/:id/process", async (c) => {
 /**
  * POST /api/payroll/periods/:id/approve
  */
-payrollRoutes.post("/periods/:id/approve", async (c) => {
+payrollRoutes.post("/periods/:id/approve", requirePermissionMiddleware(PERMISSIONS.PAYROLL_APPROVE), async (c) => {
   try {
     const id = c.req.param("id");
     const db = getDb(c.env.DB);
@@ -738,8 +788,8 @@ payrollRoutes.post("/periods/:id/approve", async (c) => {
     }
 
     const period = periodRows[0];
-    if (period.status === "paid") {
-      return jsonError(c, "PERIOD_LOCKED", "Payroll is already paid and immutable", 400);
+    if (period.status !== "processed") {
+      return jsonError(c, "INVALID_TRANSITION", `Only processed payroll can be approved; current status is '${period.status}'`, 400);
     }
 
     const now = new Date().toISOString();
@@ -763,7 +813,7 @@ payrollRoutes.post("/periods/:id/approve", async (c) => {
 /**
  * POST /api/payroll/periods/:id/mark-paid
  */
-payrollRoutes.post("/periods/:id/mark-paid", async (c) => {
+payrollRoutes.post("/periods/:id/mark-paid", requirePermissionMiddleware(PERMISSIONS.PAYROLL_APPROVE), async (c) => {
   try {
     const id = c.req.param("id");
     const db = getDb(c.env.DB);
@@ -776,6 +826,10 @@ payrollRoutes.post("/periods/:id/mark-paid", async (c) => {
 
     if (periodRows.length === 0) {
       return jsonError(c, "NOT_FOUND", "Payroll period not found", 404);
+    }
+
+    if (periodRows[0].status !== "approved") {
+      return jsonError(c, "INVALID_TRANSITION", `Only approved payroll can be marked as paid; current status is '${periodRows[0].status}'`, 400);
     }
 
     const now = new Date().toISOString();

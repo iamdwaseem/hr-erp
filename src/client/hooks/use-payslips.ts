@@ -20,7 +20,7 @@ export function usePayslips(params?: { periodId?: string; employeeId?: string; s
       if (params?.search) searchParams.set("search", params.search);
 
       const qs = searchParams.toString();
-      const res = await apiClient.get<Payslip[]>(`/api/payslips${qs ? `?${qs}` : ""}`);
+      const res = await apiClient.get<Payslip[]>(`/payslips${qs ? `?${qs}` : ""}`);
       return res || [];
     },
   });
@@ -31,7 +31,7 @@ export function usePayslip(id: string | null) {
     queryKey: payslipKeys.detail(id || ""),
     queryFn: async () => {
       if (!id) return null;
-      const res = await apiClient.get<Payslip & Record<string, any>>(`/api/payslips/${id}`);
+      const res = await apiClient.get<Payslip & Record<string, any>>(`/payslips/${id}`);
       return res || null;
     },
     enabled: Boolean(id),
@@ -43,7 +43,7 @@ export function useEmployeePayslips(employeeId: string | null) {
     queryKey: payslipKeys.employee(employeeId || ""),
     queryFn: async () => {
       if (!employeeId) return [];
-      const res = await apiClient.get<Payslip[]>(`/api/payslips/employee/${employeeId}`);
+      const res = await apiClient.get<Payslip[]>(`/payslips/employee/${employeeId}`);
       return res || [];
     },
     enabled: Boolean(employeeId),
@@ -55,7 +55,7 @@ export function useGeneratePayslips() {
   return useMutation({
     mutationFn: async (payload: { payrollPeriodId: string; employeeIds?: string[] }) => {
       const res = await apiClient.post<{ message: string; generatedCount: number }>(
-        "/api/payslips/generate",
+        "/payslips/generate",
         payload
       );
       return res;

@@ -10,6 +10,11 @@
     "build": "npm run build:client",
     "build:client": "tsc -b tsconfig.app.json && vite build",
     "check": "tsc -b",
+    "verify:hard-delete": "node scripts/verify-hard-delete.mjs",
+    "verify:payroll": "node scripts/verify-payroll-module.mjs",
+    "verify:transport": "node scripts/verify-transport-module.mjs",
+    "verify:attendance-leave": "node scripts/verify-attendance-leave-module.mjs",
+    "verify": "npm run verify:hard-delete && npm run verify:payroll && npm run verify:transport && npm run verify:attendance-leave",
     "deploy": "npm run build && wrangler deploy",
     "db:generate": "drizzle-kit generate",
     "db:migrate:local": "wrangler d1 migrations apply hr-erp-db --local",
@@ -31,6 +36,7 @@
     "react-hook-form": "^7.54.2",
     "tailwind-merge": "^3.0.1",
     "tailwindcss-animate": "^1.0.7",
+    "xlsx": "^0.18.5",
     "zod": "^3.24.1"
   },
   "devDependencies": {

@@ -15,7 +15,7 @@ export function usePayrollPeriods() {
   return useQuery({
     queryKey: payrollKeys.periods(),
     queryFn: async () => {
-      const res = await apiClient.get<PayrollPeriod[]>("/api/payroll/periods");
+      const res = await apiClient.get<PayrollPeriod[]>("/payroll/periods");
       return res || [];
     },
   });
@@ -26,7 +26,7 @@ export function usePayrollPeriod(id: string | null) {
     queryKey: payrollKeys.period(id || ""),
     queryFn: async () => {
       if (!id) return null;
-      const res = await apiClient.get<PayrollPeriod>(`/api/payroll/periods/${id}`);
+      const res = await apiClient.get<PayrollPeriod>(`/payroll/periods/${id}`);
       return res || null;
     },
     enabled: Boolean(id),
@@ -43,7 +43,7 @@ export function useCreatePayrollPeriod() {
       endDate: string;
       notes?: string | null;
     }) => {
-      const res = await apiClient.post<PayrollPeriod>("/api/payroll/periods", payload);
+      const res = await apiClient.post<PayrollPeriod>("/payroll/periods", payload);
       return res;
     },
     onSuccess: () => {
@@ -61,7 +61,7 @@ export function useGeneratePayroll() {
         generatedCount: number;
         exceptionsCount: number;
         exceptions: Array<{ employeeId: string; employeeName: string; employeeCode: string; reason: string }>;
-      }>(`/api/payroll/periods/${periodId}/generate`, {});
+      }>(`/payroll/periods/${periodId}/generate`, {});
       return res;
     },
     onSuccess: (_, periodId) => {
@@ -79,7 +79,7 @@ export function usePayrollRecords(periodId: string | null, search?: string) {
       if (!periodId) return [];
       const query = search ? `?search=${encodeURIComponent(search)}` : "";
       const res = await apiClient.get<PayrollRecord[]>(
-        `/api/payroll/periods/${periodId}/records${query}`
+        `/payroll/periods/${periodId}/records${query}`
       );
       return res || [];
     },
@@ -92,7 +92,7 @@ export function usePayrollRecord(id: string | null) {
     queryKey: payrollKeys.record(id || ""),
     queryFn: async () => {
       if (!id) return null;
-      const res = await apiClient.get<PayrollRecord>(`/api/payroll/records/${id}`);
+      const res = await apiClient.get<PayrollRecord>(`/payroll/records/${id}`);
       return res || null;
     },
     enabled: Boolean(id),
@@ -113,7 +113,7 @@ export function useAddPayrollAdjustment() {
       reason?: string | null;
     }) => {
       const res = await apiClient.post<PayrollAdjustment>(
-        `/api/payroll/records/${recordId}/adjustments`,
+        `/payroll/records/${recordId}/adjustments`,
         payload
       );
       return res;
@@ -129,7 +129,7 @@ export function useDeletePayrollAdjustment() {
   return useMutation({
     mutationFn: async (id: string) => {
       const res = await apiClient.delete<{ message: string; id: string }>(
-        `/api/payroll/adjustments/${id}`
+        `/payroll/adjustments/${id}`
       );
       return res;
     },
@@ -144,7 +144,7 @@ export function useProcessPayrollPeriod() {
   return useMutation({
     mutationFn: async (id: string) => {
       const res = await apiClient.post<{ message: string; id: string }>(
-        `/api/payroll/periods/${id}/process`,
+        `/payroll/periods/${id}/process`,
         {}
       );
       return res;
@@ -161,7 +161,7 @@ export function useApprovePayrollPeriod() {
   return useMutation({
     mutationFn: async (id: string) => {
       const res = await apiClient.post<{ message: string; id: string }>(
-        `/api/payroll/periods/${id}/approve`,
+        `/payroll/periods/${id}/approve`,
         {}
       );
       return res;
@@ -179,7 +179,7 @@ export function useMarkPayrollPeriodPaid() {
   return useMutation({
     mutationFn: async (id: string) => {
       const res = await apiClient.post<{ message: string; id: string }>(
-        `/api/payroll/periods/${id}/mark-paid`,
+        `/payroll/periods/${id}/mark-paid`,
         {}
       );
       return res;

@@ -48,7 +48,7 @@ export const GratuityPage: React.FC<GratuityPageProps> = () => {
   const { data: employees = [], isLoading: isEmployeesLoading } = useQuery<Employee[]>({
     queryKey: ["employees", "active-list"],
     queryFn: async () => {
-      const res = await apiClient.get<Employee[]>("/api/employees");
+      const res = await apiClient.get<Employee[]>("/employees");
       return res || [];
     },
   });

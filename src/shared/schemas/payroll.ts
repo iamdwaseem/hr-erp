@@ -58,17 +58,30 @@ export const assignEmployeeSalarySchema = z.object({
 // ==========================================
 // PAYROLL PERIOD SCHEMAS
 // ==========================================
-export const createPayrollPeriodSchema = z.object({
-  periodYear: z.number().int().min(2000).max(2100),
-  periodMonth: z.number().int().min(1).max(12),
-  startDate: z
-    .string()
-    .regex(/^\d{4}-\d{2}-\d{2}$/, "Start Date must be YYYY-MM-DD"),
-  endDate: z
-    .string()
-    .regex(/^\d{4}-\d{2}-\d{2}$/, "End Date must be YYYY-MM-DD"),
-  notes: z.string().max(500).optional().nullable(),
-});
+export const createPayrollPeriodSchema = z
+  .object({
+    periodYear: z.number().int().min(2000).max(2100),
+    periodMonth: z.number().int().min(1).max(12),
+    startDate: z
+      .string()
+      .regex(/^\d{4}-\d{2}-\d{2}$/, "Start Date must be YYYY-MM-DD"),
+    endDate: z
+      .string()
+      .regex(/^\d{4}-\d{2}-\d{2}$/, "End Date must be YYYY-MM-DD"),
+    notes: z.string().max(500).optional().nullable(),
+  })
+  .superRefine((data, ctx) => {
+    const start = new Date(`${data.startDate}T00:00:00Z`);
+    const end = new Date(`${data.endDate}T00:00:00Z`);
+    const expectedPrefix = `${data.periodYear}-${String(data.periodMonth).padStart(2, "0")}`;
+
+    if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime()) || data.endDate < data.startDate) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["endDate"], message: "End date must be on or after start date" });
+    }
+    if (!data.startDate.startsWith(expectedPrefix) || !data.endDate.startsWith(expectedPrefix)) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["startDate"], message: "Period dates must belong to the selected payroll month" });
+    }
+  });
 
 // ==========================================
 // PAYROLL ADJUSTMENT SCHEMAS
