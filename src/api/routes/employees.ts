@@ -6,7 +6,7 @@ import { requireRole } from "../middleware/rbac";
 import { ROLES } from "../../shared/constants/roles";
 import { getDb } from "../db/client";
 import { employees } from "../db/schema/employees";
-import { employeeDocuments } from "../db/schema/documents";
+import { employeeDocuments, employeePassports } from "../db/schema/documents";
 import { departments, designations, branches } from "../db/schema/masters";
 import { auditLogs } from "../db/schema/audit";
 import {
@@ -302,6 +302,10 @@ employeesRoutes.post("/", requireRole(ROLES.ADMIN, ROLES.HR), async (c) => {
 
   const data = parseResult.data;
   const db = getDb(c.env.DB);
+    const auditNow = new Date().toISOString();
+    const recordCreatedAt = data.recordCreatedAt && user.role === ROLES.ADMIN
+      ? `${data.recordCreatedAt}T00:00:00.000Z`
+      : auditNow;
 
   try {
     // Check uniqueness of employeeCode
@@ -337,7 +341,7 @@ employeesRoutes.post("/", requireRole(ROLES.ADMIN, ROLES.HR), async (c) => {
     }
 
     const newId = `emp_${crypto.randomUUID().replace(/-/g, "").slice(0, 12)}`;
-    const now = new Date().toISOString();
+    const now = recordCreatedAt;
 
     const resolvedLocalEmail = data.localEmail || data.email || null;
     const resolvedLocalMobile = data.localMobile || data.mobile || null;
@@ -403,6 +407,21 @@ employeesRoutes.post("/", requireRole(ROLES.ADMIN, ROLES.HR), async (c) => {
       updatedAt: now,
     });
 
+    if (data.passport) {
+      await db.insert(employeePassports).values({
+        id: `psp_${crypto.randomUUID().replace(/-/g, "").slice(0, 12)}`,
+        employeeId: newId,
+        passportNumber: data.passport.passportNumber,
+        nationality: data.passport.nationality,
+        issueDate: data.passport.issueDate,
+        expiryDate: data.passport.expiryDate,
+        placeOfIssue: data.passport.placeOfIssue || null,
+        status: "VALID",
+        createdAt: auditNow,
+        updatedAt: auditNow,
+      });
+    }
+
     // Write audit log
     try {
       await db.insert(auditLogs).values({
@@ -419,7 +438,7 @@ employeesRoutes.post("/", requireRole(ROLES.ADMIN, ROLES.HR), async (c) => {
         }),
         ipAddress: c.req.header("cf-connecting-ip") || "127.0.0.1",
         userAgent: c.req.header("user-agent") || "unknown",
-        createdAt: now,
+        createdAt: auditNow,
       });
     } catch {
       // Non-blocking

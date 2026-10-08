@@ -17,6 +17,7 @@ import { Label } from "../../components/ui/label";
 import { Select } from "../../components/ui/select";
 import { Combobox } from "../../components/ui/combobox";
 import { Card, CardHeader, CardTitle, CardContent, CardFooter } from "../../components/ui/card";
+import { useAuth } from "../../context/auth-context";
 
 interface EmployeeFormDialogProps {
   isOpen: boolean;
@@ -33,6 +34,7 @@ export const EmployeeFormDialog: React.FC<EmployeeFormDialogProps> = ({
 }) => {
   const queryClient = useQueryClient();
   const [serverError, setServerError] = useState<string | null>(null);
+  const { user } = useAuth();
 
   const { data: departments = [] } = useDepartments();
   const { data: designations = [] } = useDesignations();
@@ -92,6 +94,8 @@ export const EmployeeFormDialog: React.FC<EmployeeFormDialogProps> = ({
           designationId: employeeToEdit.designationId || "",
           branchId: employeeToEdit.branchId || "",
           employmentStatus: employeeToEdit.employmentStatus,
+          recordCreatedAt: employeeToEdit.createdAt?.slice(0, 10) || "",
+          passport: null,
         }
       : {
           employeeCode: "",
@@ -133,6 +137,8 @@ export const EmployeeFormDialog: React.FC<EmployeeFormDialogProps> = ({
           designationId: "",
           branchId: "",
           employmentStatus: "active",
+          recordCreatedAt: "",
+          passport: null,
         },
   });
 
@@ -207,6 +213,16 @@ export const EmployeeFormDialog: React.FC<EmployeeFormDialogProps> = ({
         departmentId: data.departmentId || null,
         designationId: data.designationId || null,
         branchId: data.branchId || null,
+        recordCreatedAt: data.recordCreatedAt || null,
+        passport: data.passport
+          ? {
+              passportNumber: data.passport.passportNumber.trim(),
+              nationality: data.passport.nationality.trim(),
+              issueDate: data.passport.issueDate,
+              expiryDate: data.passport.expiryDate,
+              placeOfIssue: data.passport.placeOfIssue?.trim() || null,
+            }
+          : null,
       };
 
       if (isEditing && employeeToEdit) {
@@ -358,6 +374,13 @@ export const EmployeeFormDialog: React.FC<EmployeeFormDialogProps> = ({
                 2. Employment Details
               </h4>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {!isEditing && user?.role === "ADMIN" && (
+                  <div className="space-y-1.5">
+                    <Label htmlFor="recordCreatedAt">Record Created Date (Admin)</Label>
+                    <Input id="recordCreatedAt" type="date" {...register("recordCreatedAt")} />
+                    <p className="text-[11px] text-muted-foreground">Audit event time remains the actual save time.</p>
+                  </div>
+                )}
                 <div className="space-y-1.5">
                   <Label htmlFor="joiningDate">Joining Date *</Label>
                   <Input
@@ -421,6 +444,37 @@ export const EmployeeFormDialog: React.FC<EmployeeFormDialogProps> = ({
                 </div>
               </div>
             </div>
+
+            {!isEditing && (
+              <div className="space-y-3 pt-3 border-t">
+                <h4 className="text-xs font-bold uppercase tracking-wider text-primary">
+                  Passport Details (Optional)
+                </h4>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="space-y-1.5">
+                    <Label htmlFor="passport.passportNumber">Passport Number</Label>
+                    <Input id="passport.passportNumber" {...register("passport.passportNumber")} />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="passport.nationality">Passport Nationality</Label>
+                    <Input id="passport.nationality" {...register("passport.nationality")} />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="passport.issueDate">Issue Date</Label>
+                    <Input id="passport.issueDate" type="date" {...register("passport.issueDate")} />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="passport.expiryDate">Expiry Date</Label>
+                    <Input id="passport.expiryDate" type="date" {...register("passport.expiryDate")} />
+                  </div>
+                  <div className="sm:col-span-2 space-y-1.5">
+                    <Label htmlFor="passport.placeOfIssue">Place of Issue</Label>
+                    <Input id="passport.placeOfIssue" {...register("passport.placeOfIssue")} />
+                  </div>
+                </div>
+                <p className="text-[11px] text-muted-foreground">Complete all passport fields together, or leave the section blank.</p>
+              </div>
+            )}
 
             {/* Section 3: Local / Work-Country Contact */}
             <div className="space-y-3 pt-3 border-t">

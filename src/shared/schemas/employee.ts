@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { passportSchema } from "./document";
 
 export const EMPLOYMENT_STATUSES = [
   "active",
@@ -129,6 +130,15 @@ export const createEmployeeSchema = z.object({
     errorMap: () => ({ message: "Please select a valid employment status" }),
   }).default("active"),
   userId: z.string().optional().nullable(),
+  recordCreatedAt: optionalDateStringSchema,
+  passport: z.preprocess(
+    (value) => {
+      if (!value || typeof value !== "object") return value;
+      const fields = value as Record<string, unknown>;
+      return Object.values(fields).every((field) => !field) ? undefined : value;
+    },
+    passportSchema.optional().nullable()
+  ),
 });
 
 export type CreateEmployeeInput = z.infer<typeof createEmployeeSchema>;
